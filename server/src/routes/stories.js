@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
 import { Character, CHAR_STATUS, REL_TYPES, Story, Turn } from '../models.js';
-import { describeRejected, foldMemory, lockStory, nextColor, rewind, setRelationship, unlockStory, writeScene } from '../engine.js';
+import { describeRejected, foldMemory, lockStory, nextColor, rewind, setChapterTitle, setRelationship, unlockStory, writeScene } from '../engine.js';
 import { requireUser } from './auth.js';
 
 const router = Router();
@@ -95,14 +95,19 @@ router.post('/', aiLimiter, async (req, res) => {
 router.get('/:id', async (req, res) => {
   const limit = 40;
   const before = Number(req.query.before);
-  const filter = { story: req.story._id, ...(Number.isFinite(before) ? { index: { $lt: before } } : {}) };
-  const turns = (await Turn.find(filter).sort('-index').limit(limit + 1).lean()).reverse();
+  const newest = await Turn.findOne({ story: req.story._id }).sort('-index').select('chapter').lean();
+  const lastChapter = newest?.chapter ?? 1;
+  const chapter = Number(req.query.chapter) || lastChapter;
+  const filter = { story: req.story._id, chapter, ...(Number.isFinite(before) ? { index: { $lt: before } } : {}) };
+  const turns = (await Turn.find(filter).sort('-index').limit(limit + 1).select('-before').lean()).reverse();
   const hasMore = turns.length > limit;
   res.json({
     story: req.story,
     characters: await castOf(req.story),
     turns: hasMore ? turns.slice(1) : turns,
     hasMore,
+    chapter,
+    lastChapter,
   });
 });
 
@@ -152,7 +157,7 @@ router.post('/:id/chapters', aiLimiter, async (req, res) => {
   await withLock(req, res, async (story) => {
     const meta = { prevStatus: story.status, prevChapter: story.chapter };
     const previous = { chapter: story.chapter, titles: [...story.chapterTitles] };
-    story.chapterTitles[story.chapter] = chapterTitle;
+    setChapterTitle(story, story.chapter + 1, chapterTitle);
     story.chapter += 1;
     try {
       const { turn, characters } = await writeScene({ story, mode: 'chapter', input, chapterTitle, meta });
@@ -213,7 +218,7 @@ router.post('/:id/turns/:turnId/retry', aiLimiter, async (req, res) => {
 
     const meta = { prevStatus: story.status, prevChapter: story.chapter };
     if (mode === 'chapter') {
-      story.chapterTitles[story.chapter] = chapterTitle;
+      setChapterTitle(story, story.chapter + 1, chapterTitle);
       story.chapter += 1;
     }
     const { turn, characters } = await writeScene({
@@ -272,12 +277,18 @@ router.delete('/:id/turns/:turnId/beats/:beatId', async (req, res) => {
 /* ---------- characters ---------- */
 
 function applyCharacterFields(character, body) {
-  for (const field of ['role', 'description', 'personality', 'motive', 'faction']) {
+  for (const field of ['role', 'description', 'personality', 'motive', 'faction', 'voice']) {
     if (body[field] !== undefined) character[field] = text(body[field], 1000);
   }
   if (body.name !== undefined && text(body.name, 80)) character.name = text(body.name, 80);
   if (CHAR_STATUS.includes(body.status)) character.status = body.status;
   if (['ai', 'user'].includes(body.control)) character.control = body.control;
+  // A secret the user writes stays visible to them. The AI's own secrets stay hidden.
+  if (typeof body.secret === 'string') {
+    character.secret = text(body.secret, 500);
+    character.secretBy = 'user';
+    character.secretRevealed = false;
+  }
 }
 
 router.post('/:id/characters', async (req, res) => {

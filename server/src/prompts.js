@@ -1,3 +1,5 @@
+import { apexOf, rankCast } from './game.js';
+
 const FREEDOM = {
   strict:
     'STORY CONTROL: STRICT. Use only the people, places and events the user has established. Add no new named characters and no plot twists of your own. Enrich what the user wrote, nothing more.',
@@ -22,6 +24,18 @@ THE USER IS THE AUTHOR
 - If they ask to change sides ("Ali and Sara form an alliance", "make them enemies"), show it in the scene and record it in relationshipChanges and characterChanges.
 - A character marked CONTROL: USER belongs to the user. Play out the actions the user gives them, but do not invent their decisions or new lines of speech.
 - Every other character is yours. Speak for them, decide what they do, and let them act on their motives without being asked.
+
+THE STORY IS A LIVING GAME
+- Every character has power, a rank, reputation, bonds and sometimes a secret. These decide how people behave. Use them, and report what changed.
+- After every scene, update characterChanges, relationshipChanges and combat so the numbers match what happened. Every meaningful action counts: saving someone, betraying someone, a cruel word, a brave stand. Give each character who did something an event line.
+- Rank shapes behaviour. Lower ranks show caution around higher ranks, and nobody treats the strongest person casually.
+- A character marked APEX is the most feared person in the story. Others show them extra respect or fear, and lower their voices. APEX is a note for you only: never use the word in the story or as a title. One weaker fighter cannot beat them. Only two or more fighters together, or the character ranked just below them, can. If they lose or are hurt, their rank falls, and they can climb back through later deeds.
+- If the user names the apex falling, it happens, because the user is the author.
+- Heroes and villains are not decided in advance. People become what they do. Leave alignment unknown until the story shows it.
+- Bonds move with every exchange. Characters who fight side by side or save each other grow close. Betrayal and cruelty push them apart. Keep scoreChange small for small moments and large for big ones.
+- Secrets drive the plot. Give only one or two characters a secret when you create them, such as a hidden past or hidden strength. Most people have none. Hint at it through behaviour, and never state it until the moment it comes out, then set secretRevealed. Keep secrets out of event lines, titles and roles until then.
+- A CONCEALED character hides how strong they are. Let them act weaker than they are, with small slips that make people wonder.
+- Each character has a VOICE. Keep it so a reader could tell who is speaking with the name covered.
 
 WRITE IT WELL
 - Expand a few lines into a real scene with specific, sensory detail. Show, do not tell.
@@ -58,7 +72,7 @@ function relationLines(character, byId) {
     .map((r) => {
       const target = byId.get(String(r.target));
       if (!target) return null;
-      return `${target.name}: ${r.type}${r.label ? ` (${r.label})` : ''}`;
+      return `${target.name}: ${r.type} ${r.score ?? 0}${r.label ? ` (${r.label})` : ''}`;
     })
     .filter(Boolean)
     .join('; ');
@@ -67,15 +81,23 @@ function relationLines(character, byId) {
 export function castBlock(characters) {
   if (!characters.length) return 'No characters yet.';
   const byId = new Map(characters.map((c) => [String(c._id), c]));
+  const ranked = rankCast(characters);
+  const apex = apexOf(ranked);
   return characters
     .map((c) => {
+      const rank = ranked.indexOf(c) + 1;
       const parts = [
-        `- ${c.name}${c.role ? `, ${c.role}` : ''}`,
+        `- ${c.name}${c.title ? ` "${c.title}"` : ''}${c.role ? `, ${c.role}` : ''}`,
         `  CONTROL: ${c.control === 'user' ? 'USER' : 'AI'} | STATUS: ${c.status}${c.faction ? ` | GROUP: ${c.faction}` : ''}`,
+        `  RANK: ${rank ? `#${rank}` : 'none'}${c === apex ? ' (APEX)' : ''} | POWER: ${c.power} | ALIGNMENT: ${c.alignment} | REPUTATION: ${c.reputation} | KILLS: ${c.kills}`,
       ];
       if (c.description) parts.push(`  Looks: ${c.description}`);
       if (c.personality) parts.push(`  Personality: ${c.personality}`);
+      if (c.voice) parts.push(`  VOICE: ${c.voice}`);
       if (c.motive) parts.push(`  Motive: ${c.motive}`);
+      if (c.concealed) parts.push('  CONCEALED: everyone thinks they are weak.');
+      if (c.secret && !c.secretRevealed) parts.push(`  SECRET (nobody knows yet): ${c.secret}`);
+      if (c.secret && c.secretRevealed) parts.push(`  Known secret: ${c.secret}`);
       const rel = relationLines(c, byId);
       if (rel) parts.push(`  Bonds: ${rel}`);
       return parts.join('\n');
@@ -101,7 +123,7 @@ export function turnToText(turn) {
 function task({ mode, input, speakerName, story, chapterTitle }) {
   switch (mode) {
     case 'opening':
-      return `Write the opening scene of chapter 1. The user's idea is the premise above. Create every character the user mentioned in newCharacters, with their relationships in relationshipChanges. Add a title and a setting. If the user writes as "I", create that character with isUser true.`;
+      return `Write the opening scene of chapter 1. The user's idea is the premise above. Create every character the user mentioned in newCharacters, with power, voice and any secret, and their relationships in relationshipChanges. Add a title and a setting. If the user writes as "I", create that character with isUser true.`;
     case 'speak':
       return `The user plays ${speakerName} and does this:\n"""${input}"""\nInclude what ${speakerName} says or does as written, polished only lightly, then play out how everyone else reacts.`;
     case 'continue':
@@ -117,7 +139,7 @@ function task({ mode, input, speakerName, story, chapterTitle }) {
   }
 }
 
-export function buildTurnPrompt({ story, characters, recentTurns, mode, input, speakerName, chapterTitle, retryNote, sceneCast = [] }) {
+export function buildTurnPrompt({ story, characters, recentTurns, mode, input, speakerName, chapterTitle, retryNote, sceneCast = [], wrapChapter = false }) {
   const sections = [
     `PREMISE (from the user):\n${story.premise}`,
     story.genre ? `GENRE: ${story.genre}` : '',
@@ -129,6 +151,9 @@ export function buildTurnPrompt({ story, characters, recentTurns, mode, input, s
     recentTurns.length ? `RECENT SCENES:\n${recentTurns.map(turnToText).join('\n\n')}` : '',
     sceneCast.length
       ? `WHO IS IN THIS SCENE: the user chose only ${sceneCast.join(', ')}. Everyone else in the cast is somewhere else: they must not speak, act, think or appear, and do not add new characters. Explain any absence naturally, or simply leave them out. The only exception is someone the user names in their direction below.`
+      : '',
+    wrapChapter
+      ? 'CHAPTER: this chapter has run long. Bring it to a strong stopping point soon. When a scene lands on a cliffhanger or turning point, set endChapter to true and give nextChapterTitle.'
       : '',
     `SCENE LENGTH: ${LENGTH[story.length]}.`,
     `YOUR TASK:\n${task({ mode, input, speakerName, story, chapterTitle })}`,

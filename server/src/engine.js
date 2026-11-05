@@ -1,28 +1,19 @@
-import { Character, REL_TYPES, CHAR_STATUS, Story, Turn } from './models.js';
+import { Character, Story, Turn } from './models.js';
 import { AiError, generate, turnSchema } from './gemini.js';
+import { applyGameResult, findCharacter, namedIn, startingStats } from './game.js';
 import { MEMORY_SYSTEM, SYSTEM_PROMPT, buildMemoryPrompt, buildTurnPrompt, turnToText } from './prompts.js';
 
 const COLORS = ['#b4532a', '#2f6f73', '#7a4a9e', '#3f7d3a', '#b0304a', '#2d5fa8', '#a67a12', '#8a5a44', '#c2407e', '#4b6b8a'];
 const RECENT_TURNS = 14; // scenes sent word for word
 const FOLD_BATCH = 8; // scenes folded into memory at a time
 const LOCK_MS = 3 * 60 * 1000;
+const CHAPTER_WRAP = 9; // scenes before the AI is asked to close the chapter
+const CHAPTER_MIN = 5; // the AI cannot end a chapter sooner than this
+const CHAPTER_MAX = 14; // scenes after which a chapter always ends
+
+export { findCharacter, setRelationship } from './game.js';
 
 export const nextColor = (count) => COLORS[count % COLORS.length];
-
-const norm = (s) => String(s || '').trim().toLowerCase();
-
-/** Finds a character by full name, then by a unique first-word or partial match. */
-export function findCharacter(characters, name) {
-  const n = norm(name);
-  if (!n) return null;
-  const exact = characters.find((c) => norm(c.name) === n);
-  if (exact) return exact;
-  const partial = characters.filter((c) => {
-    const cn = norm(c.name);
-    return cn.split(/\s+/).includes(n) || n.split(/\s+/).includes(cn);
-  });
-  return partial.length === 1 ? partial[0] : null;
-}
 
 /** Stops two generations running on one story at once, for example after a double tap. */
 export async function lockStory(storyId, ownerId) {
@@ -42,26 +33,21 @@ export async function lockStory(storyId, ownerId) {
 
 export const unlockStory = (storyId) => Story.updateOne({ _id: storyId }, { generatingSince: null });
 
+const SNAPSHOT_FIELDS = ['status', 'faction', 'motive', 'role', 'power', 'reputation', 'alignment', 'title', 'kills', 'villainsSlain', 'concealed', 'secretRevealed'];
+
 const snapshot = (c) => ({
   character: c._id,
-  status: c.status,
-  faction: c.faction,
-  motive: c.motive,
-  relationships: c.relationships.map((r) => ({ target: r.target, type: r.type, label: r.label })),
+  ...Object.fromEntries(SNAPSHOT_FIELDS.map((key) => [key, c[key]])),
+  history: c.history.map((h) => ({ chapter: h.chapter, text: h.text })),
+  relationships: c.relationships.map((r) => ({ target: r.target, type: r.type, label: r.label, score: r.score })),
 });
 
-export function setRelationship(a, b, type, label = '', reverseLabel = '') {
-  const put = (from, to, text) => {
-    const existing = from.relationships.find((r) => String(r.target) === String(to._id));
-    if (existing) {
-      existing.type = type;
-      if (text) existing.label = text;
-    } else {
-      from.relationships.push({ target: to._id, type, label: text });
-    }
-  };
-  put(a, b, label);
-  put(b, a, reverseLabel);
+/** Stores a chapter title by chapter number. Chapter 1 sits at position 0. */
+export function setChapterTitle(story, chapter, title) {
+  const titles = [...story.chapterTitles];
+  while (titles.length < chapter) titles.push('');
+  titles[chapter - 1] = title;
+  story.chapterTitles = titles;
 }
 
 /** Saves one AI scene: new cast, changed bonds and beats, plus the data needed to undo it. */
@@ -81,6 +67,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
       motive: data.motive || '',
       faction: data.faction || '',
       control: data.isUser ? 'user' : 'ai',
+      ...startingStats(data),
       color: nextColor(characters.length),
       source: 'ai',
     });
@@ -90,7 +77,17 @@ async function applyResult({ story, characters, result, base, inScene }) {
   };
 
   for (const data of result.newCharacters ?? []) {
-    if (data?.name?.trim() && !findCharacter(characters, data.name) && inScene(data.name)) addCharacter(data);
+    if (!data?.name?.trim() || !inScene(data.name)) continue;
+    const existing = findCharacter(characters, data.name);
+    if (!existing) {
+      addCharacter(data);
+    } else if (base.mode === 'opening') {
+      // Characters the user added by hand get their stats from the opening too.
+      Object.assign(existing, startingStats(data));
+      for (const field of ['role', 'description', 'personality', 'motive', 'faction']) {
+        existing[field] ||= data[field] ?? '';
+      }
+    }
   }
 
   const beats = [];
@@ -106,7 +103,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
 
     let character = null;
     if (b.type !== 'narration' && speaker) {
-      character = findCharacter(characters, speaker) ?? addCharacter({ name: speaker, role: 'Minor character' });
+      character = findCharacter(characters, speaker) ?? addCharacter({ name: speaker, role: 'Minor character', power: 25 });
     }
     // A line with no known speaker still reads correctly as narration.
     if (!character && b.type === 'dialogue') text = `"${text}"`;
@@ -119,23 +116,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
   }
   if (!beats.length) throw new AiError('The AI returned an empty scene. Please try again.', 503);
 
-  for (const r of result.relationshipChanges ?? []) {
-    const a = findCharacter(characters, r.from);
-    const b = findCharacter(characters, r.to);
-    if (!a || !b || a === b || !REL_TYPES.includes(r.type) || !inScene(a.name) || !inScene(b.name)) continue;
-    touch(a);
-    touch(b);
-    setRelationship(a, b, r.type, r.label || '', r.reverseLabel || '');
-  }
-
-  for (const ch of result.characterChanges ?? []) {
-    const c = findCharacter(characters, ch.name);
-    if (!c || !inScene(c.name)) continue;
-    touch(c);
-    if (CHAR_STATUS.includes(ch.status)) c.status = ch.status;
-    if (ch.faction) c.faction = ch.faction;
-    if (ch.motive) c.motive = ch.motive;
-  }
+  const effects = applyGameResult({ result, characters, inScene, touch, input: base.input, chapter: story.chapter });
 
   await Promise.all(characters.filter((c) => c.isNew || c.isModified()).map((c) => c.save()));
 
@@ -146,6 +127,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
     chapter: story.chapter,
     heading: String(result.heading ?? '').trim().slice(0, 80),
     beats,
+    effects,
     suggestions: (result.suggestions ?? []).slice(0, 3),
     createdCharacters: created.map((c) => c._id),
     before: [...before.values()],
@@ -159,9 +141,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
  */
 export function sceneFilter(chosen, input) {
   if (!chosen.length) return () => true;
-  const words = norm(input).split(/[^\p{L}\p{N}]+/u);
-  const named = (name) => norm(name).split(/\s+/).some((part) => words.includes(part));
-  return (name) => Boolean(findCharacter(chosen, name)) || named(name);
+  return (name) => Boolean(findCharacter(chosen, name)) || namedIn(input, name);
 }
 
 /** Writes one scene with the AI and stores it. The caller must already hold the story lock. */
@@ -171,6 +151,7 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
   if (wanted.size && speaker) wanted.add(String(speaker._id));
   const chosen = characters.filter((c) => wanted.has(String(c._id)));
   const inScene = sceneFilter(chosen, input);
+  const chapterScenes = await Turn.countDocuments({ story: story._id, chapter: story.chapter });
   const recentTurns = (await Turn.find({ story: story._id }).sort('-index').limit(RECENT_TURNS).lean())
     .filter((t) => t.index > story.memoryThrough)
     .reverse();
@@ -185,8 +166,12 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
     chapterTitle,
     retryNote,
     sceneCast: chosen.map((c) => c.name),
+    wrapChapter: chapterScenes >= CHAPTER_WRAP && !['chapter', 'ending', 'opening'].includes(mode),
   });
-  const result = await generate({ system: SYSTEM_PROMPT, prompt, schema: turnSchema, temperature: 1 });
+  const request = { system: SYSTEM_PROMPT, prompt, schema: turnSchema, temperature: 1 };
+  let result = await generate(request);
+  // Without a cast list every character would start with the same empty stats.
+  if (mode === 'opening' && !result.newCharacters?.length) result = await generate(request);
 
   const turn = await applyResult({
     story,
@@ -204,6 +189,15 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
   });
 
   story.nextIndex = turn.index + 1;
+  // Long chapters close by themselves, so the next scene opens a new page.
+  const scenes = chapterScenes + 1;
+  const canTurnPage = !['ending', 'opening'].includes(mode);
+  if (canTurnPage && (scenes >= CHAPTER_MAX || (result.endChapter && scenes >= CHAPTER_MIN))) {
+    story.chapter += 1;
+    setChapterTitle(story, story.chapter, String(result.nextChapterTitle ?? '').trim().slice(0, 120));
+    turn.effects.push({ kind: 'chapter', text: `Chapter ${story.chapter - 1} complete. Chapter ${story.chapter} begins next` });
+    await turn.save();
+  }
   if (mode === 'opening') {
     if (result.title?.trim() && story.title === 'Untitled story') story.title = result.title.trim().slice(0, 120);
     if (result.setting?.trim()) story.setting = result.setting.trim();
@@ -235,7 +229,7 @@ export async function rewind(story, fromIndex) {
   }
   await Turn.deleteMany({ story: story._id, index: { $gte: fromIndex } });
 
-  story.chapterTitles = story.chapterTitles.slice(0, Math.max(story.chapter - 1, 0));
+  story.chapterTitles = story.chapterTitles.slice(0, story.chapter);
   story.nextIndex = fromIndex;
   if (story.memoryThrough >= fromIndex) {
     story.memoryHistory = story.memoryHistory.filter((h) => h.through < fromIndex);

@@ -9,6 +9,9 @@ Works on phones, tablets and desktops, and can be installed to a phone's home sc
 - **Sign in** with Google, or with email and password.
 - **Start from a few lines.** The AI creates the people you name, and builds the story around what you wrote.
 - **Direct or play.** Direct the scene and let the AI play everyone, or speak as one character. Send an empty box and the AI continues by itself.
+- **Play it like a game.** Characters have power, ranks, reputation, bonds and secrets, and every scene changes them. Legends glow, and only two or more fighters, or the next rank, can bring down the strongest.
+- **Tap any character** to open their file: stats, relationships and full record.
+- **Automatic chapters.** Long chapters close at a turning point, and each chapter is its own page.
 - **Choose who is in a scene.** Tick two or three characters and the AI leaves everyone else out, unless you name them in your direction.
 - **Add people by typing.** "My uncle Tariq bursts in" adds Tariq to the cast with his relationship.
 - **Control the cast.** Open a character to change their motive, group, condition, relationships, and whether the AI or only you decide what they do. Add characters by hand, or group several into an alliance or make them enemies.

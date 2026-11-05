@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const { Schema, model } = mongoose;
 const ObjectId = Schema.Types.ObjectId;
 
-export const REL_TYPES = ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral'];
+export const REL_TYPES = ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral', 'trusted', 'nemesis'];
 export const CHAR_STATUS = ['active', 'injured', 'captured', 'missing', 'dead'];
 
 const userSchema = new Schema(
@@ -54,12 +54,26 @@ const characterSchema = new Schema(
     control: { type: String, enum: ['ai', 'user'], default: 'ai' },
     color: { type: String, default: '#b4532a' },
     source: { type: String, enum: ['ai', 'user'], default: 'ai' },
+    // Game stats. Rank comes from power, and alignment comes from reputation.
+    power: { type: Number, default: 40 },
+    reputation: { type: Number, default: 0 },
+    alignment: { type: String, enum: ['hero', 'villain', 'grey', 'unknown'], default: 'unknown' },
+    title: { type: String, default: '' },
+    voice: { type: String, default: '' },
+    kills: { type: Number, default: 0 },
+    villainsSlain: { type: Number, default: 0 },
+    secret: { type: String, default: '' },
+    secretBy: { type: String, enum: ['ai', 'user'], default: 'ai' },
+    secretRevealed: { type: Boolean, default: false },
+    concealed: { type: Boolean, default: false }, // hiding their true power
+    history: { type: [{ chapter: Number, text: String, _id: false }], default: [] },
     relationships: {
       type: [
         {
           target: { type: ObjectId, ref: 'Character', required: true },
           type: { type: String, enum: REL_TYPES, default: 'neutral' },
           label: { type: String, default: '' },
+          score: { type: Number, default: 0 }, // -100 hatred to 100 complete trust
           _id: false,
         },
       ],
@@ -68,6 +82,16 @@ const characterSchema = new Schema(
   },
   { timestamps: true },
 );
+
+// Hidden information never leaves the server until the story reveals it.
+characterSchema.set('toJSON', {
+  transform(_doc, out) {
+    out.hasSecret = Boolean(out.secret) && !out.secretRevealed;
+    if (out.hasSecret && out.secretBy !== 'user') delete out.secret;
+    if (out.concealed) delete out.power;
+    return out;
+  },
+});
 
 const beatSchema = new Schema({
   type: { type: String, enum: ['narration', 'dialogue', 'action', 'thought'], required: true },
@@ -93,28 +117,23 @@ const turnSchema = new Schema(
     // Characters the user limited this scene to. Empty means everyone.
     sceneCast: { type: [ObjectId], default: [] },
     beats: { type: [beatSchema], default: [] },
+    effects: { type: [{ kind: String, text: String, _id: false }], default: [] },
     suggestions: { type: [String], default: [] },
     // Undo data, so Retry and Delete put the cast back exactly as it was.
     createdCharacters: { type: [ObjectId], default: [] },
-    before: {
-      type: [
-        {
-          character: ObjectId,
-          status: String,
-          faction: String,
-          motive: String,
-          relationships: Schema.Types.Mixed,
-          _id: false,
-        },
-      ],
-      default: [],
-    },
+    before: { type: [Schema.Types.Mixed], default: [] },
     prevStatus: { type: String, default: 'active' },
     prevChapter: { type: Number, default: 1 },
   },
   { timestamps: true },
 );
 turnSchema.index({ story: 1, index: 1 }, { unique: true });
+turnSchema.set('toJSON', {
+  transform(_doc, out) {
+    delete out.before; // holds hidden stats, and only the server needs it
+    return out;
+  },
+});
 
 export const User = model('User', userSchema);
 export const Story = model('Story', storySchema);

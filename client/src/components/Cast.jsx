@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { ALIGNMENTS, rankCast, tierOf } from '../game.js';
 import { Avatar, Sheet } from './ui.jsx';
 
 const REL_TYPES = [
   ['neutral', 'Neutral'],
+  ['trusted', 'Trusted'],
   ['ally', 'Ally'],
   ['enemy', 'Enemy'],
+  ['nemesis', 'Nemesis'],
   ['friend', 'Friend'],
   ['family', 'Family'],
   ['love', 'Love'],
@@ -13,14 +16,32 @@ const REL_TYPES = [
 ];
 const STATUS = ['active', 'injured', 'captured', 'missing', 'dead'];
 
+function CastRow({ character, rank, onOpen }) {
+  const tier = tierOf(character);
+  return (
+    <button className={`cast-row${rank === 1 ? ' top' : ''}`} onClick={() => onOpen(character)}>
+      {rank > 0 && <span className="rank-number">{rank === 1 ? '👑' : rank}</span>}
+      <Avatar character={character} />
+      <span className="cast-text">
+        <strong>{character.name}</strong>
+        <small>{character.title || character.role || ALIGNMENTS[character.alignment]}</small>
+        {character.power !== undefined && character.status !== 'dead' && (
+          <span className={`power-bar tier-${tier.key}`}><i style={{ width: `${character.power}%` }} /></span>
+        )}
+      </span>
+      <span className="cast-side">
+        <b>{character.status === 'dead' ? '' : character.power ?? '???'}</b>
+        {character.status !== 'active' && <span className={`tag ${character.status}`}>{character.status}</span>}
+        {character.control === 'user' && <span className="tag">You</span>}
+      </span>
+    </button>
+  );
+}
+
 export function CastList({ characters, onOpen, onAdd, onGroup }) {
-  const groups = new Map();
-  for (const c of characters) {
-    const key = c.faction || '';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(c);
-  }
-  const ordered = [...groups.entries()].sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+  const ranked = rankCast(characters);
+  const hidden = characters.filter((c) => c.power === undefined && c.status !== 'dead');
+  const fallen = characters.filter((c) => c.status === 'dead');
 
   return (
     <div className="cast-list">
@@ -28,22 +49,11 @@ export function CastList({ characters, onOpen, onAdd, onGroup }) {
         <button className="btn small" onClick={onAdd}>Add character</button>
         <button className="btn small" onClick={onGroup} disabled={characters.length < 2}>Group or split</button>
       </div>
-      {ordered.map(([faction, members]) => (
-        <section key={faction}>
-          {(faction || groups.size > 1) && <h3>{faction || 'No group'}</h3>}
-          {members.map((c) => (
-            <button key={c._id} className="cast-row" onClick={() => onOpen(c)}>
-              <Avatar character={c} />
-              <span className="cast-text">
-                <strong>{c.name}</strong>
-                <small>{c.role || 'Tap to add details'}</small>
-              </span>
-              {c.status !== 'active' && <span className={`tag ${c.status}`}>{c.status}</span>}
-              {c.control === 'user' && <span className="tag">You</span>}
-            </button>
-          ))}
-        </section>
-      ))}
+      {ranked.map((c, i) => <CastRow key={c._id} character={c} rank={i + 1} onOpen={onOpen} />)}
+      {hidden.length > 0 && <h3>Hiding their strength</h3>}
+      {hidden.map((c) => <CastRow key={c._id} character={c} rank={0} onOpen={onOpen} />)}
+      {fallen.length > 0 && <h3>Fallen</h3>}
+      {fallen.map((c) => <CastRow key={c._id} character={c} rank={0} onOpen={onOpen} />)}
       {!characters.length && <p className="muted">No characters yet.</p>}
     </div>
   );
@@ -60,7 +70,11 @@ export function CharacterSheet({ storyId, character, characters, onSaved, onClos
     faction: character?.faction ?? '',
     status: character?.status ?? 'active',
     control: character?.control ?? 'ai',
+    voice: character?.voice ?? '',
   });
+  // The AI's own secrets stay hidden, so only an empty or user-written secret can be edited.
+  const canEditSecret = isNew || !character.hasSecret || Boolean(character.secret);
+  const [secret, setSecret] = useState(character?.secret ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
@@ -84,10 +98,12 @@ export function CharacterSheet({ storyId, character, characters, onSaved, onClos
     e.preventDefault();
     run(async () => {
       if (isNew) {
-        const { character: created } = await api.post(url, form);
+        const { character: created } = await api.post(url, secret ? { ...form, secret } : form);
         onSaved([...characters, created]);
       } else {
-        onSaved((await api.patch(`${url}/${character._id}`, form)).characters);
+        const changedSecret = canEditSecret && secret !== (character.secret ?? '');
+        const body = changedSecret ? { ...form, secret } : form;
+        onSaved((await api.patch(`${url}/${character._id}`, body)).characters);
       }
     });
   };
@@ -130,7 +146,11 @@ export function CharacterSheet({ storyId, character, characters, onSaved, onClos
 
         <label>Motive<textarea rows={2} value={form.motive} onChange={set('motive')} placeholder="What do they want?" /></label>
         <label>Personality<textarea rows={2} value={form.personality} onChange={set('personality')} /></label>
+        <label>Way of speaking<textarea rows={2} value={form.voice} onChange={set('voice')} placeholder="Short and sharp, never says sorry" /></label>
         <label>Appearance<textarea rows={2} value={form.description} onChange={set('description')} /></label>
+        {canEditSecret && (
+          <label>Secret<textarea rows={2} value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Something only you and the AI know" /></label>
+        )}
 
         {!isNew && others.length > 0 && (
           <div className="field">

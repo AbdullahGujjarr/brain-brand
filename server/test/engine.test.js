@@ -42,8 +42,8 @@ test('setRelationship links both characters and keeps labels', () => {
   const a = { _id: 'a', relationships: [] };
   const b = { _id: 'b', relationships: [] };
   setRelationship(a, b, 'family', 'brother', 'sister');
-  assert.deepEqual(a.relationships, [{ target: 'b', type: 'family', label: 'brother' }]);
-  assert.deepEqual(b.relationships, [{ target: 'a', type: 'family', label: 'sister' }]);
+  assert.deepEqual(a.relationships, [{ target: 'b', type: 'family', label: 'brother', score: 50 }]);
+  assert.deepEqual(b.relationships, [{ target: 'a', type: 'family', label: 'sister', score: 50 }]);
 
   setRelationship(a, b, 'enemy');
   assert.equal(a.relationships.length, 1);

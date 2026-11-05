@@ -36,6 +36,12 @@ const newCharacter = {
     personality: str('How they think and talk.'),
     motive: str('What they secretly or openly want right now.'),
     faction: str('Group or alliance name, or empty.'),
+    power: { type: Type.INTEGER, description: 'True strength from 5 to 95. Ordinary people 15-35, trained fighters 40-65, feared masters 70-90.' },
+    alignment: { type: Type.STRING, enum: ['hero', 'villain', 'grey', 'unknown'], description: 'Use unknown unless the user made it clear.' },
+    title: str('A short nickname only if they already have one, otherwise empty.'),
+    voice: str('Their distinct way of speaking, such as "clipped, never finishes a sentence" or "polite, then cruel".'),
+    secret: str('Something they hide that can change the story later. Empty if they have none.'),
+    concealed: { type: Type.BOOLEAN, description: 'True if they pretend to be weaker than they are.' },
     isUser: { type: Type.BOOLEAN, description: 'True only if this is the user writing as "I" or "me".' },
   },
   required: ['name', 'role', 'description', 'personality', 'motive'],
@@ -49,8 +55,9 @@ const relationship = {
     type: { type: Type.STRING, enum: ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral'] },
     label: str('What "from" is to "to", such as "brother" or "sworn enemy".'),
     reverseLabel: str('What "to" is to "from", such as "sister".'),
+    scoreChange: { type: Type.INTEGER, description: 'How much this scene moved their bond, from -40 to 40.' },
   },
-  required: ['from', 'to', 'type'],
+  required: ['from', 'to', 'scoreChange'],
 };
 
 export const turnSchema = {
@@ -82,17 +89,38 @@ export const turnSchema = {
           status: { type: Type.STRING, enum: ['active', 'injured', 'captured', 'missing', 'dead'] },
           faction: str('New group or alliance, only if it changed.'),
           motive: str('New motive, only if it changed.'),
+          role: str('New role, only if the story changed who they are.'),
+          title: str('A title they earned in this scene, only for a truly big moment.'),
+          powerChange: { type: Type.INTEGER, description: 'From -20 to 20. Do not repeat what combat already covers.' },
+          reputationChange: { type: Type.INTEGER, description: 'From -25 to 25. Good deeds raise it, cruelty lowers it.' },
+          event: str('One short line for their record, such as "Spared Ali on the roof".'),
+          secretRevealed: { type: Type.BOOLEAN, description: 'True only if their secret or hidden power came out in this scene.' },
         },
         required: ['name'],
       },
     },
+    combat: {
+      type: Type.ARRAY,
+      description: 'Every fight with a clear result in this scene.',
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          winners: { type: Type.ARRAY, items: { type: Type.STRING } },
+          loser: str('Character name.'),
+          killed: { type: Type.BOOLEAN },
+        },
+        required: ['winners', 'loser', 'killed'],
+      },
+    },
+    endChapter: { type: Type.BOOLEAN, description: 'True if this scene closes the chapter.' },
+    nextChapterTitle: str('Title of the next chapter, only if endChapter is true.'),
     suggestions: {
       type: Type.ARRAY,
       description: 'Three short, different ideas for what the user could direct next.',
       items: { type: Type.STRING },
     },
   },
-  required: ['heading', 'beats', 'suggestions'],
+  required: ['heading', 'newCharacters', 'beats', 'suggestions'],
 };
 
 function friendlyError(err) {

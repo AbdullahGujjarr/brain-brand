@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import Composer from '../components/Composer.jsx';
 import { CastList, CharacterSheet, GroupSheet, SceneSheet } from '../components/Cast.jsx';
 import { Scene } from '../components/Scene.jsx';
+import { ProfileSheet } from '../components/Profile.jsx';
 import { Confirm, Sheet } from '../components/ui.jsx';
 import { FREEDOM } from './NewStory.jsx';
 
@@ -18,6 +19,8 @@ export default function StoryPage() {
   const [characters, setCharacters] = useState([]);
   const [turns, setTurns] = useState([]);
   const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1); // the chapter on screen
+  const [lastChapter, setLastChapter] = useState(1); // the chapter holding the newest scene
   const [loadError, setLoadError] = useState('');
 
   const [text, setText] = useState('');
@@ -33,20 +36,26 @@ export default function StoryPage() {
   const feed = useRef(null);
   const scrollTarget = useRef('bottom');
 
+  const showChapter = useCallback(async (chapter) => {
+    const d = await api.get(chapter ? `${base}?chapter=${chapter}` : base);
+    const latest = d.chapter >= d.lastChapter;
+    // A brand-new story or an old chapter reads from the top; the latest page resumes at the end.
+    scrollTarget.current = !latest || d.turns.length === 1 ? d.turns[0]?._id ?? null : 'bottom';
+    setStory(d.story);
+    setCharacters(d.characters);
+    setTurns(d.turns);
+    setHasMore(d.hasMore);
+    setPage(d.chapter);
+    setLastChapter(d.lastChapter);
+    return d;
+  }, [base]);
+
   useEffect(() => {
-    api.get(base)
-      .then((d) => {
-        // A brand-new story is read from the top; a longer one resumes at the end.
-        scrollTarget.current = d.turns.length === 1 ? d.turns[0]._id : 'bottom';
-        setStory(d.story);
-        setCharacters(d.characters);
-        setTurns(d.turns);
-        setHasMore(d.hasMore);
-        // Carry on with the same characters as the last scene.
-        setSceneCast(d.turns.at(-1)?.sceneCast ?? []);
-      })
+    showChapter()
+      // Carry on with the same characters as the last scene.
+      .then((d) => setSceneCast(d.turns.at(-1)?.sceneCast ?? []))
       .catch((e) => (e.status === 404 ? navigate('/', { replace: true }) : setLoadError(e.message)));
-  }, [base, navigate]);
+  }, [showChapter, navigate]);
 
   useLayoutEffect(() => {
     const el = feed.current;
@@ -79,7 +88,13 @@ export default function StoryPage() {
       const res = await request();
       setStory(res.story);
       setCharacters(res.characters);
-      setTurns((prev) => [...prev.filter((t) => keepBelow === undefined || t.index < keepBelow), res.turn]);
+      setTurns((prev) => {
+        const kept = prev.filter((t) => keepBelow === undefined || t.index < keepBelow);
+        // A scene from a new chapter starts a new page.
+        return kept[0] && kept[0].chapter !== res.turn.chapter ? [res.turn] : [...kept, res.turn];
+      });
+      setPage(res.turn.chapter);
+      setLastChapter(res.turn.chapter);
       setFreshId(res.turn._id);
       scrollTarget.current = res.turn._id;
     });
@@ -143,8 +158,10 @@ export default function StoryPage() {
           const res = await api.del(`${base}/turns/${turn._id}`);
           setStory(res.story);
           setCharacters(res.characters);
-          setTurns((prev) => prev.filter((t) => t.index < res.removedFrom));
+          const remaining = turns.filter((t) => t.index < res.removedFrom);
+          setTurns(remaining);
           setText(turn.input);
+          if (!remaining.length) await showChapter();
         });
       },
     });
@@ -161,7 +178,7 @@ export default function StoryPage() {
   async function loadEarlier() {
     await attempt(async () => {
       const first = turns[0];
-      const res = await api.get(`${base}?before=${first.index}`);
+      const res = await api.get(`${base}?chapter=${page}&before=${first.index}`);
       setTurns([...res.turns, ...turns]);
       setHasMore(res.hasMore);
       scrollTarget.current = first._id;
@@ -198,9 +215,12 @@ export default function StoryPage() {
 
   const last = turns.at(-1);
   const ended = story.status === 'ended';
+  const readOnly = page < lastChapter;
+  const openProfile = (character) => setPanel({ type: 'profile', id: character._id });
+  const profiled = panel?.type === 'profile' && characters.find((c) => c._id === panel.id);
   const castProps = {
     characters,
-    onOpen: (character) => setPanel({ type: 'character', character }),
+    onOpen: (character) => setPanel({ type: 'profile', id: character._id }),
     onAdd: () => setPanel({ type: 'character', character: null }),
     onGroup: () => setPanel({ type: 'group' }),
   };
@@ -213,9 +233,24 @@ export default function StoryPage() {
           <h1>{story.title}</h1>
           <span>Chapter {story.chapter}{ended ? ' · Ended' : ''}</span>
         </div>
-        <button className="btn small cast-toggle" onClick={() => setPanel({ type: 'cast' })}>Cast {characters.length}</button>
+        <button className="btn small cast-toggle" onClick={() => setPanel({ type: 'cast' })}>Ranks</button>
         <button className="btn small" onClick={() => setPanel({ type: 'settings' })}>Story</button>
       </header>
+
+      {story.chapter > 1 && (
+        <nav className="chapter-tabs" aria-label="Chapters">
+          {Array.from({ length: story.chapter }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              className={n === page ? 'on' : ''}
+              aria-current={n === page ? 'page' : undefined}
+              onClick={() => attempt(() => showChapter(n))}
+            >
+              Chapter {n}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="story-layout">
         <div className="story-main">
@@ -232,6 +267,8 @@ export default function StoryPage() {
                       characters={characters}
                       fresh={turn._id === freshId}
                       chapterHeading={startsChapter ? `Chapter ${turn.chapter}${title ? `: ${title}` : ''}` : ''}
+                      readOnly={readOnly}
+                      onOpen={openProfile}
                       onRetry={startRetry}
                       onDelete={deleteScene}
                       onSaveBeat={saveBeat}
@@ -240,7 +277,8 @@ export default function StoryPage() {
                   </div>
                 );
               })}
-              {!busy && !retry && !ended && last?.suggestions?.length > 0 && (
+              {!turns.length && <p className="empty-page">This chapter begins with your next move.</p>}
+              {!busy && !retry && !ended && !readOnly && last?.suggestions?.length > 0 && (
                 <section className="next-ideas" aria-label="Ideas for what happens next">
                   <h3>What happens next?</h3>
                   {last.suggestions.map((idea) => (
@@ -263,7 +301,12 @@ export default function StoryPage() {
             </div>
           )}
 
-          {ended && !retry ? (
+          {readOnly ? (
+            <div className="ended-bar">
+              <span>Reading Chapter {page}</span>
+              <button className="btn small" onClick={() => attempt(() => showChapter())}>Go to latest</button>
+            </div>
+          ) : ended && !retry ? (
             <div className="ended-bar">
               <span>The end.</span>
               <button className="btn small" onClick={reopen}>Continue this story</button>
@@ -289,15 +332,25 @@ export default function StoryPage() {
         </div>
 
         <aside className="cast-panel" aria-label="Cast">
-          <h2>Cast</h2>
+          <h2>Power ranking</h2>
           <CastList {...castProps} />
         </aside>
       </div>
 
       {panel?.type === 'cast' && (
-        <Sheet title="Cast" onClose={() => setPanel(null)}>
+        <Sheet title="Power ranking" onClose={() => setPanel(null)}>
           <CastList {...castProps} />
         </Sheet>
+      )}
+      {profiled && (
+        <ProfileSheet
+          key={profiled._id}
+          character={profiled}
+          characters={characters}
+          onOpen={openProfile}
+          onEdit={() => setPanel({ type: 'character', character: profiled })}
+          onClose={() => setPanel(null)}
+        />
       )}
       {panel?.type === 'character' && (
         <CharacterSheet
