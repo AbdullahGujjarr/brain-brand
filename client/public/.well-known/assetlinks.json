@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.brainbrand.app",
+      "sha256_cert_fingerprints": [
+        "40:E4:46:5A:74:B1:B9:7D:39:3F:F1:FC:F8:79:C8:53:C3:58:70:F5:91:0A:D9:EF:7B:80:D1:30:31:CD:B9:0C"
+      ]
+    }
+  }
+]

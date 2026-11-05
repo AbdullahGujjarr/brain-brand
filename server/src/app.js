@@ -42,7 +42,7 @@ export function createApp() {
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
   if (fs.existsSync(config.clientDist)) {
-    app.use(express.static(config.clientDist, { index: false, maxAge: '1h' }));
+    app.use(express.static(config.clientDist, { index: false, maxAge: '1h', dotfiles: 'allow' }));
     app.get('/{*path}', (_req, res) => res.sendFile(path.join(config.clientDist, 'index.html')));
   }
 
