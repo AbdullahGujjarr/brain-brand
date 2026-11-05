@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: brain-brand
+    runtime: node
+    plan: free
+    # NODE_ENV=production skips dev dependencies, and the client build needs them.
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_DB
+        value: brainbrand
+      - key: GEMINI_MODELS
+        value: gemini-3-flash-preview,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite
+      - key: GOOGLE_CLIENT_ID
+        value: 75094760267-5sdpeu1dkutlso8hmacum46j9iritko9.apps.googleusercontent.com
+      - key: JWT_SECRET
+        generateValue: true
+      # Secrets: Render asks for these once, and they never go in the repo.
+      - key: MONGODB_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
