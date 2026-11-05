@@ -142,6 +142,7 @@ async function applyResult({ story, characters, result, base }) {
     story: story._id,
     index: story.nextIndex,
     chapter: story.chapter,
+    heading: String(result.heading ?? '').trim().slice(0, 80),
     beats,
     suggestions: (result.suggestions ?? []).slice(0, 3),
     createdCharacters: created.map((c) => c._id),

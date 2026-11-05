@@ -34,6 +34,10 @@ WRITE IT WELL
 FORMAT
 - Return a list of beats in the order they happen. narration is scene prose, dialogue is spoken words only, action is a character's physical move, thought is a character's private thought.
 - Use dialogue often, so the scene reads like a live conversation between the cast. Write action and thought beats in the third person.
+- Keep every beat short, because people read this on a phone. Narration and action beats are one to three sentences. Dialogue is one or two sentences. Split a long moment into several beats, and never write a wall of text.
+- Mix the beat types so the rhythm changes. Avoid two narration beats in a row.
+- Give each scene a heading: a short, evocative title of two to five words.
+- Use *italics* only for a stressed word or a sound, such as *CRACK*. Use no other markdown, no lists and no headings inside beats.
 - Every dialogue, action and thought beat must name its speaker. Every speaker must be a character in the cast or in newCharacters, spelled the same way.
 - Write in the same language and script as the user. If they write Roman Urdu, reply in Roman Urdu. If they mix languages, mirror that.
 - Give three short, different suggestions for the user's next direction, in that same language.

@@ -89,6 +89,7 @@ const turnSchema = new Schema(
     input: { type: String, default: '' },
     speaker: { type: ObjectId, ref: 'Character', default: null },
     speakerName: { type: String, default: '' },
+    heading: { type: String, default: '' },
     beats: { type: [beatSchema], default: [] },
     suggestions: { type: [String], default: [] },
     // Undo data, so Retry and Delete put the cast back exactly as it was.

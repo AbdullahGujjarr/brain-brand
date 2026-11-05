@@ -234,6 +234,14 @@ export default function StoryPage() {
                   </div>
                 );
               })}
+              {!busy && !retry && !ended && last?.suggestions?.length > 0 && (
+                <section className="next-ideas" aria-label="Ideas for what happens next">
+                  <h3>What happens next?</h3>
+                  {last.suggestions.map((idea) => (
+                    <button key={idea} className={text === idea ? 'on' : ''} onClick={() => setText(idea)}>{idea}</button>
+                  ))}
+                </section>
+              )}
               {busy && (
                 <div className="writing" role="status">
                   <span className="dots"><i /><i /><i /></span> The cast is writing the scene…
@@ -261,7 +269,6 @@ export default function StoryPage() {
               speakerId={speakerId}
               setSpeakerId={setSpeakerId}
               characters={characters}
-              suggestions={last?.suggestions}
               busy={busy}
               retry={retry}
               onCancelRetry={() => {

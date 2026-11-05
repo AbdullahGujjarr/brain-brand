@@ -58,6 +58,7 @@ export const turnSchema = {
   properties: {
     title: str('Short story title of two to five words, with no chapter name. Only needed for the opening scene.'),
     setting: str('World and place in one or two sentences. Only needed for the opening scene.'),
+    heading: str('Short scene title of two to five words, in the story language.'),
     newCharacters: { type: Type.ARRAY, items: newCharacter },
     beats: {
       type: Type.ARRAY,
@@ -91,7 +92,7 @@ export const turnSchema = {
       items: { type: Type.STRING },
     },
   },
-  required: ['beats', 'suggestions'],
+  required: ['heading', 'beats', 'suggestions'],
 };
 
 function friendlyError(err) {

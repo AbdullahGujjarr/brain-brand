@@ -1,11 +1,22 @@
 import { useState } from 'react';
 import { Avatar } from './ui.jsx';
 
-function Beat({ beat, character, fresh, delay, onSave, onDelete }) {
+/** Shows *italics* and **bold** from the AI as real text styles, never as raw HTML. */
+function Rich({ text }) {
+  return text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g).map((part, i) => {
+    if (/^\*\*.+\*\*$/.test(part)) return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (/^\*.+\*$/.test(part)) return <em key={i}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+}
+
+const isSpoken = (beat) => beat?.type === 'dialogue' || beat?.type === 'thought';
+
+function Beat({ beat, character, continued, fresh, delay, onSave, onDelete }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(null);
   const style = fresh ? { animationDelay: `${delay}ms` } : undefined;
-  const cls = `beat ${beat.type}${fresh ? ' fresh' : ''}`;
+  const cls = `beat ${beat.type}${continued ? ' continued' : ''}${fresh ? ' fresh' : ''}`;
 
   if (draft !== null) {
     return (
@@ -35,13 +46,17 @@ function Beat({ beat, character, fresh, delay, onSave, onDelete }) {
   );
   const toggle = () => setOpen(!open);
 
-  if (beat.type === 'dialogue' || beat.type === 'thought') {
+  if (isSpoken(beat)) {
     return (
       <div className={cls} style={style}>
-        <Avatar character={character} name={beat.speaker} />
+        {continued ? <span className="avatar-gap" /> : <Avatar character={character} name={beat.speaker} size={32} />}
         <div className="bubble-wrap">
-          <span className="speaker" style={{ color: character?.color }}>{beat.speaker}</span>
-          <button className="bubble" onClick={toggle} aria-expanded={open}>{beat.text}</button>
+          {!continued && (
+            <span className="speaker" style={{ color: character?.color }}>
+              {beat.speaker}{beat.type === 'thought' && <span className="thinks"> thinks</span>}
+            </span>
+          )}
+          <button className="bubble" onClick={toggle} aria-expanded={open}><Rich text={beat.text} /></button>
           {tools}
         </div>
       </div>
@@ -49,7 +64,7 @@ function Beat({ beat, character, fresh, delay, onSave, onDelete }) {
   }
   return (
     <div className={cls} style={{ ...style, '--who': character?.color }}>
-      <button className="prose" onClick={toggle} aria-expanded={open}>{beat.text}</button>
+      <button className="prose" onClick={toggle} aria-expanded={open}><Rich text={beat.text} /></button>
       {tools}
     </div>
   );
@@ -68,17 +83,23 @@ export function Scene({ turn, characters, fresh, chapterHeading, onRetry, onDele
           <p>{turn.input}</p>
         </div>
       )}
-      {turn.beats.map((beat, i) => (
-        <Beat
-          key={beat._id}
-          beat={beat}
-          character={byId.get(beat.character)}
-          fresh={fresh}
-          delay={Math.min(i * 140, 1800)}
-          onSave={(text) => onSaveBeat(turn, beat, text)}
-          onDelete={() => onDeleteBeat(turn, beat)}
-        />
-      ))}
+      {turn.heading && <h3 className="scene-title">{turn.heading}</h3>}
+      {turn.beats.map((beat, i) => {
+        const prev = turn.beats[i - 1];
+        const continued = isSpoken(beat) && isSpoken(prev) && prev.speaker === beat.speaker && prev.type === beat.type;
+        return (
+          <Beat
+            key={beat._id}
+            beat={beat}
+            character={byId.get(beat.character)}
+            continued={continued}
+            fresh={fresh}
+            delay={Math.min(i * 140, 1800)}
+            onSave={(text) => onSaveBeat(turn, beat, text)}
+            onDelete={() => onDeleteBeat(turn, beat)}
+          />
+        );
+      })}
       <div className="scene-tools">
         <button onClick={() => onRetry(turn)}>Try again</button>
         {turn.mode !== 'opening' && <button onClick={() => onDelete(turn)}>Delete scene</button>}
