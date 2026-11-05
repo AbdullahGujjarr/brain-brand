@@ -65,7 +65,7 @@ export function setRelationship(a, b, type, label = '', reverseLabel = '') {
 }
 
 /** Saves one AI scene: new cast, changed bonds and beats, plus the data needed to undo it. */
-async function applyResult({ story, characters, result, base }) {
+async function applyResult({ story, characters, result, base, inScene }) {
   const before = new Map();
   const touch = (c) => {
     if (!c.isNew && !before.has(String(c._id))) before.set(String(c._id), snapshot(c));
@@ -90,7 +90,7 @@ async function applyResult({ story, characters, result, base }) {
   };
 
   for (const data of result.newCharacters ?? []) {
-    if (data?.name?.trim() && !findCharacter(characters, data.name)) addCharacter(data);
+    if (data?.name?.trim() && !findCharacter(characters, data.name) && inScene(data.name)) addCharacter(data);
   }
 
   const beats = [];
@@ -101,6 +101,8 @@ async function applyResult({ story, characters, result, base }) {
     // Smaller models sometimes write "Ali: words" instead of filling in the speaker.
     const prefix = !speaker && b.type !== 'narration' && /^([^:\n]{1,40}):\s+(.+)$/s.exec(text);
     if (prefix && findCharacter(characters, prefix[1])) [, speaker, text] = prefix;
+    // The user chose who is in this scene, so lines from anyone else are dropped.
+    if (b.type !== 'narration' && speaker && !inScene(speaker)) continue;
 
     let character = null;
     if (b.type !== 'narration' && speaker) {
@@ -120,7 +122,7 @@ async function applyResult({ story, characters, result, base }) {
   for (const r of result.relationshipChanges ?? []) {
     const a = findCharacter(characters, r.from);
     const b = findCharacter(characters, r.to);
-    if (!a || !b || a === b || !REL_TYPES.includes(r.type)) continue;
+    if (!a || !b || a === b || !REL_TYPES.includes(r.type) || !inScene(a.name) || !inScene(b.name)) continue;
     touch(a);
     touch(b);
     setRelationship(a, b, r.type, r.label || '', r.reverseLabel || '');
@@ -128,7 +130,7 @@ async function applyResult({ story, characters, result, base }) {
 
   for (const ch of result.characterChanges ?? []) {
     const c = findCharacter(characters, ch.name);
-    if (!c) continue;
+    if (!c || !inScene(c.name)) continue;
     touch(c);
     if (CHAR_STATUS.includes(ch.status)) c.status = ch.status;
     if (ch.faction) c.faction = ch.faction;
@@ -151,9 +153,24 @@ async function applyResult({ story, characters, result, base }) {
   return turn;
 }
 
+/**
+ * Decides who may act in a scene. With nobody chosen, everyone may. Otherwise only
+ * the chosen characters may, plus anyone the user names in their own direction.
+ */
+export function sceneFilter(chosen, input) {
+  if (!chosen.length) return () => true;
+  const words = norm(input).split(/[^\p{L}\p{N}]+/u);
+  const named = (name) => norm(name).split(/\s+/).some((part) => words.includes(part));
+  return (name) => Boolean(findCharacter(chosen, name)) || named(name);
+}
+
 /** Writes one scene with the AI and stores it. The caller must already hold the story lock. */
-export async function writeScene({ story, mode, input = '', speaker = null, chapterTitle = '', retryNote = '', meta = {} }) {
+export async function writeScene({ story, mode, input = '', speaker = null, chapterTitle = '', retryNote = '', castIds = [], meta = {} }) {
   const characters = await Character.find({ story: story._id }).sort('createdAt');
+  const wanted = new Set(castIds.map(String));
+  if (wanted.size && speaker) wanted.add(String(speaker._id));
+  const chosen = characters.filter((c) => wanted.has(String(c._id)));
+  const inScene = sceneFilter(chosen, input);
   const recentTurns = (await Turn.find({ story: story._id }).sort('-index').limit(RECENT_TURNS).lean())
     .filter((t) => t.index > story.memoryThrough)
     .reverse();
@@ -167,6 +184,7 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
     speakerName: speaker?.name,
     chapterTitle,
     retryNote,
+    sceneCast: chosen.map((c) => c.name),
   });
   const result = await generate({ system: SYSTEM_PROMPT, prompt, schema: turnSchema, temperature: 1 });
 
@@ -174,7 +192,15 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
     story,
     characters,
     result,
-    base: { mode, input, speaker: speaker?._id ?? null, speakerName: speaker?.name ?? '', ...meta },
+    inScene,
+    base: {
+      mode,
+      input,
+      speaker: speaker?._id ?? null,
+      speakerName: speaker?.name ?? '',
+      sceneCast: chosen.map((c) => c._id),
+      ...meta,
+    },
   });
 
   story.nextIndex = turn.index + 1;

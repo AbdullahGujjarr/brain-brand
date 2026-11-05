@@ -84,6 +84,11 @@ export function Scene({ turn, characters, fresh, chapterHeading, onRetry, onDele
         </div>
       )}
       {turn.heading && <h3 className="scene-title">{turn.heading}</h3>}
+      {turn.sceneCast?.length > 0 && (
+        <p className="scene-cast">
+          In this scene: {turn.sceneCast.map((id) => byId.get(id)?.name).filter(Boolean).join(', ')}
+        </p>
+      )}
       {turn.beats.map((beat, i) => {
         const prev = turn.beats[i - 1];
         const continued = isSpoken(beat) && isSpoken(prev) && prev.speaker === beat.speaker && prev.type === beat.type;

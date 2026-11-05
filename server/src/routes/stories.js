@@ -23,6 +23,7 @@ const FREEDOM = ['strict', 'balanced', 'free'];
 const LENGTHS = ['short', 'medium', 'long'];
 
 const fail = (res, status, error) => res.status(status).json({ error });
+const readCastIds = (value) => (Array.isArray(value) ? value.filter(isId).slice(0, 50) : []);
 
 router.param('id', async (req, res, next, id) => {
   if (!isId(id)) return fail(res, 404, 'Story not found.');
@@ -137,7 +138,8 @@ router.post('/:id/turns', aiLimiter, async (req, res) => {
 
   await withLock(req, res, async (story) => {
     const meta = { prevStatus: story.status, prevChapter: story.chapter };
-    const { turn, characters } = await writeScene({ story, mode, input, speaker, meta });
+    const castIds = readCastIds(req.body.castIds);
+    const { turn, characters } = await writeScene({ story, mode, input, speaker, castIds, meta });
     return { story, turn, characters };
   });
 });
@@ -221,6 +223,9 @@ router.post('/:id/turns/:turnId/retry', aiLimiter, async (req, res) => {
       speaker: mode === 'speak' ? speaker : null,
       chapterTitle,
       retryNote: rejected,
+      castIds: ['direct', 'continue', 'speak'].includes(mode)
+        ? readCastIds(req.body.castIds ?? old.sceneCast.map(String))
+        : [],
       meta,
     });
     if (mode === 'ending') {

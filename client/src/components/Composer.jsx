@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Avatar } from './ui.jsx';
 
-export default function Composer({ text, setText, speakerId, setSpeakerId, characters, busy, retry, onCancelRetry, onSend }) {
+export default function Composer({ text, setText, speakerId, setSpeakerId, characters, sceneCount, onPickScene, busy, retry, onCancelRetry, onSend }) {
   const box = useRef(null);
   const speaker = characters.find((c) => c._id === speakerId);
   const hasText = Boolean(text.trim());
@@ -67,6 +67,14 @@ export default function Composer({ text, setText, speakerId, setSpeakerId, chara
               ))}
             </select>
           </label>
+          <button
+            className={`scene-pick${sceneCount ? ' on' : ''}`}
+            aria-label="Choose who is in this scene"
+            onClick={onPickScene}
+          >
+            <span className="speaker-name">{sceneCount ? `${sceneCount} in scene` : 'Everyone'}</span>
+            <span className="caret" aria-hidden="true">▾</span>
+          </button>
           <button
             className={`send${hasText || retry ? ' round' : ''}`}
             disabled={blocked}

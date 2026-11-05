@@ -187,8 +187,17 @@ legend .muted { font-weight: 400; }
 .composer-box:focus-within { border-color: var(--accent); }
 .composer-box textarea { display: block; min-height: 40px; max-height: 140px; padding: 9px 10px 4px; border: 0; background: transparent; resize: none; outline: none; }
 .composer-box textarea:focus { outline: none; }
-.composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.speaker-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 62%; min-height: 36px; padding: 3px 11px 3px 8px; background: var(--surface-2); border-radius: 999px; font-size: 0.86rem; font-weight: 600; }
+.composer-bar { display: flex; align-items: center; gap: 6px; }
+.composer-bar .send { margin-left: auto; }
+.scene-pick { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 36px; padding: 3px 10px; background: var(--surface-2); border-radius: 999px; font-size: 0.86rem; font-weight: 600; }
+.scene-pick.on { background: var(--accent); color: var(--accent-ink); }
+.scene-pick.on .caret { color: inherit; }
+.scene-cast { margin: -6px 0 12px; font-size: 0.8rem; color: var(--muted); }
+.sheet-hint { margin-bottom: 8px; font-size: 0.92rem; }
+.pick-name { min-width: 0; display: grid; line-height: 1.25; }
+.pick-name small { color: var(--muted); font-size: 0.8rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pick { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.speaker-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: 36px; padding: 3px 11px 3px 8px; background: var(--surface-2); border-radius: 999px; font-size: 0.86rem; font-weight: 600; }
 .speaker-pick select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; padding: 0; }
 .speaker-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .caret { color: var(--muted); font-size: 0.72rem; }

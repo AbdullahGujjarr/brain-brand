@@ -170,6 +170,42 @@ export function CharacterSheet({ storyId, character, characters, onSaved, onClos
   );
 }
 
+export function SceneSheet({ characters, selected, onChange, onClose }) {
+  const [picked, setPicked] = useState(selected);
+  const toggle = (id) => setPicked(picked.includes(id) ? picked.filter((p) => p !== id) : [...picked, id]);
+  const living = characters.filter((c) => c.status !== 'dead');
+
+  return (
+    <Sheet title="Who is in this scene?" onClose={onClose}>
+      <p className="muted sheet-hint">The AI will only use the characters you tick. Leave all unticked to use everyone.</p>
+      <div className="pick-list">
+        {living.map((c) => (
+          <label key={c._id} className="pick">
+            <input type="checkbox" checked={picked.includes(c._id)} onChange={() => toggle(c._id)} />
+            <Avatar character={c} size={28} />
+            <span className="pick-name">
+              {c.name}
+              {c.role && <small>{c.role}</small>}
+            </span>
+          </label>
+        ))}
+      </div>
+      <div className="sheet-actions">
+        <button className="btn" onClick={() => setPicked([])} disabled={!picked.length}>Clear</button>
+        <button
+          className="btn primary"
+          onClick={() => {
+            onChange(picked);
+            onClose();
+          }}
+        >
+          {picked.length ? `Use ${picked.length} in scene` : 'Use everyone'}
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 export function GroupSheet({ storyId, characters, onSaved, onClose }) {
   const [picked, setPicked] = useState([]);
   const [action, setAction] = useState('alliance');

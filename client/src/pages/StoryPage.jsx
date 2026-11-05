@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Composer from '../components/Composer.jsx';
-import { CastList, CharacterSheet, GroupSheet } from '../components/Cast.jsx';
+import { CastList, CharacterSheet, GroupSheet, SceneSheet } from '../components/Cast.jsx';
 import { Scene } from '../components/Scene.jsx';
 import { Confirm, Sheet } from '../components/ui.jsx';
 import { FREEDOM } from './NewStory.jsx';
@@ -22,6 +22,7 @@ export default function StoryPage() {
 
   const [text, setText] = useState('');
   const [speakerId, setSpeakerId] = useState('');
+  const [sceneCast, setSceneCast] = useState([]);
   const [retry, setRetry] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,8 @@ export default function StoryPage() {
         setCharacters(d.characters);
         setTurns(d.turns);
         setHasMore(d.hasMore);
+        // Carry on with the same characters as the last scene.
+        setSceneCast(d.turns.at(-1)?.sceneCast ?? []);
       })
       .catch((e) => (e.status === 404 ? navigate('/', { replace: true }) : setLoadError(e.message)));
   }, [base, navigate]);
@@ -85,7 +88,7 @@ export default function StoryPage() {
   }
 
   async function send() {
-    const body = { input: text };
+    const body = { input: text, castIds: activeCast };
     if (retry) {
       const ok = await write(() => api.post(`${base}/turns/${retry._id}/retry`, body), retry.index);
       if (ok) {
@@ -97,6 +100,9 @@ export default function StoryPage() {
     if (speakerId) body.speakerId = speakerId;
     if (await write(() => api.post(`${base}/turns`, body))) setText('');
   }
+
+  // A chosen character may have died or been removed since they were picked.
+  const activeCast = sceneCast.filter((id) => characters.some((c) => c._id === id && c.status !== 'dead'));
 
   const laterCount = (turn) => (story?.nextIndex ?? 0) - turn.index - 1;
   const scenesAfter = (n) => (n === 1 ? 'the scene' : `the ${n} scenes`);
@@ -269,6 +275,8 @@ export default function StoryPage() {
               speakerId={speakerId}
               setSpeakerId={setSpeakerId}
               characters={characters}
+              sceneCount={activeCast.length}
+              onPickScene={() => setPanel({ type: 'scene' })}
               busy={busy}
               retry={retry}
               onCancelRetry={() => {
@@ -300,6 +308,9 @@ export default function StoryPage() {
           onSaved={setCharacters}
           onClose={() => setPanel(null)}
         />
+      )}
+      {panel?.type === 'scene' && (
+        <SceneSheet characters={characters} selected={activeCast} onChange={setSceneCast} onClose={() => setPanel(null)} />
       )}
       {panel?.type === 'group' && (
         <GroupSheet storyId={id} characters={characters} onSaved={setCharacters} onClose={() => setPanel(null)} />

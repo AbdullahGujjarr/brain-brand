@@ -109,7 +109,7 @@ function task({ mode, input, speakerName, story, chapterTitle }) {
   }
 }
 
-export function buildTurnPrompt({ story, characters, recentTurns, mode, input, speakerName, chapterTitle, retryNote }) {
+export function buildTurnPrompt({ story, characters, recentTurns, mode, input, speakerName, chapterTitle, retryNote, sceneCast = [] }) {
   const sections = [
     `PREMISE (from the user):\n${story.premise}`,
     story.genre ? `GENRE: ${story.genre}` : '',
@@ -119,6 +119,9 @@ export function buildTurnPrompt({ story, characters, recentTurns, mode, input, s
     `CAST:\n${castBlock(characters)}`,
     story.memory ? `STORY MEMORY (everything before the recent scenes):\n${story.memory}` : '',
     recentTurns.length ? `RECENT SCENES:\n${recentTurns.map(turnToText).join('\n\n')}` : '',
+    sceneCast.length
+      ? `WHO IS IN THIS SCENE: the user chose only ${sceneCast.join(', ')}. Everyone else in the cast is somewhere else: they must not speak, act, think or appear, and do not add new characters. Explain any absence naturally, or simply leave them out. The only exception is someone the user names in their direction below.`
+      : '',
     `SCENE LENGTH: ${LENGTH[story.length]}.`,
     `YOUR TASK:\n${task({ mode, input, speakerName, story, chapterTitle })}`,
     retryNote

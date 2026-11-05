@@ -90,6 +90,8 @@ const turnSchema = new Schema(
     speaker: { type: ObjectId, ref: 'Character', default: null },
     speakerName: { type: String, default: '' },
     heading: { type: String, default: '' },
+    // Characters the user limited this scene to. Empty means everyone.
+    sceneCast: { type: [ObjectId], default: [] },
     beats: { type: [beatSchema], default: [] },
     suggestions: { type: [String], default: [] },
     // Undo data, so Retry and Delete put the cast back exactly as it was.

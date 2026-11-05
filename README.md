@@ -9,6 +9,7 @@ Works on phones, tablets and desktops, and can be installed to a phone's home sc
 - **Sign in** with Google, or with email and password.
 - **Start from a few lines.** The AI creates the people you name, and builds the story around what you wrote.
 - **Direct or play.** Direct the scene and let the AI play everyone, or speak as one character. Send an empty box and the AI continues by itself.
+- **Choose who is in a scene.** Tick two or three characters and the AI leaves everyone else out, unless you name them in your direction.
 - **Add people by typing.** "My uncle Tariq bursts in" adds Tariq to the cast with his relationship.
 - **Control the cast.** Open a character to change their motive, group, condition, relationships, and whether the AI or only you decide what they do. Add characters by hand, or group several into an alliance or make them enemies.
 - **Don't like it? Change it.** Tap a line to edit or delete it. Use Try again on a scene to rewrite it, with a new direction if you want. Characters and relationships from removed scenes are undone.

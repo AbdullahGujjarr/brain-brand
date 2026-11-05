@@ -4,7 +4,26 @@ import { test } from 'node:test';
 process.env.MONGODB_URI ||= 'mongodb://localhost/test';
 process.env.JWT_SECRET ||= 'test-secret';
 
-const { findCharacter, setRelationship } = await import('../src/engine.js');
+const { findCharacter, sceneFilter, setRelationship } = await import('../src/engine.js');
+
+test('sceneFilter allows everyone when nobody is chosen', () => {
+  assert.equal(sceneFilter([], 'anything')('Ali'), true);
+});
+
+test('sceneFilter keeps only the chosen cast', () => {
+  const inScene = sceneFilter([{ name: 'Zara Khan' }, { name: 'Ali' }], 'They argue about the money.');
+  assert.equal(inScene('Zara'), true);
+  assert.equal(inScene('Ali'), true);
+  assert.equal(inScene('Bilal'), false);
+  assert.equal(inScene('Thug'), false);
+});
+
+test('sceneFilter lets in someone the user names', () => {
+  const inScene = sceneFilter([{ name: 'Zara' }], 'Suddenly Tariq walks in.');
+  assert.equal(inScene('Tariq'), true);
+  assert.equal(inScene('Uncle Tariq'), true);
+  assert.equal(inScene('Bilal'), false);
+});
 
 test('findCharacter matches full and unique partial names', () => {
   const cast = [{ name: 'Zara Khan' }, { name: 'Ali' }];
