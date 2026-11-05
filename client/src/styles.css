@@ -153,7 +153,8 @@ legend .muted { font-weight: 400; }
 .beat.action { margin: 12px 0; padding: 9px 12px; background: var(--surface-2); border-left: 3px solid var(--who, var(--accent)); border-radius: 4px 12px 12px 4px; }
 .beat.action .prose { font-size: 0.98rem; line-height: 1.55; }
 .beat.dialogue, .beat.thought { display: flex; gap: 8px; align-items: flex-start; }
-.beat.continued { margin-top: -7px; }
+.beat.dialogue + .beat.dialogue { margin-top: -4px; }
+.beat.continued, .beat.dialogue + .beat.dialogue.continued { margin-top: -7px; }
 .avatar-gap { width: 32px; flex: none; }
 .bubble-wrap { min-width: 0; max-width: min(84%, 560px); }
 .speaker { display: block; margin: 0 0 2px 3px; font-size: 0.8rem; font-weight: 700; }
