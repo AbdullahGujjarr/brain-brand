@@ -114,6 +114,12 @@ legend .muted { font-weight: 400; }
 .choice.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .char-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 40px; gap: 8px; align-items: center; }
 
+/* privacy page */
+.legal h2 { margin: 24px 0 6px; font: 600 1.15rem/1.3 var(--prose); }
+.legal p, .legal li { margin-bottom: 8px; }
+.legal ul { margin: 0; padding-left: 20px; }
+.legal .link { overflow-wrap: anywhere; }
+
 /* story screen */
 .story-page { display: flex; flex-direction: column; height: 100dvh; }
 .topbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); background: var(--surface); border-bottom: 1px solid var(--line); }

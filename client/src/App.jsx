@@ -4,6 +4,7 @@ import { api } from './api.js';
 import AuthPage from './pages/AuthPage.jsx';
 import Library from './pages/Library.jsx';
 import NewStory from './pages/NewStory.jsx';
+import Privacy from './pages/Privacy.jsx';
 import StoryPage from './pages/StoryPage.jsx';
 
 const AuthContext = createContext(null);
@@ -20,16 +21,19 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, setUser }}>
-      {user ? (
-        <Routes>
-          <Route path="/" element={<Library />} />
-          <Route path="/new" element={<NewStory />} />
-          <Route path="/story/:id" element={<StoryPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      ) : (
-        <AuthPage />
-      )}
+      <Routes>
+        <Route path="/privacy" element={<Privacy />} />
+        {user ? (
+          <>
+            <Route path="/" element={<Library />} />
+            <Route path="/new" element={<NewStory />} />
+            <Route path="/story/:id" element={<StoryPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        ) : (
+          <Route path="*" element={<AuthPage />} />
+        )}
+      </Routes>
     </AuthContext.Provider>
   );
 }

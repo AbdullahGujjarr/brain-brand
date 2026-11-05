@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 
@@ -124,6 +125,7 @@ export default function AuthPage() {
             {isRegister ? 'Sign in' : 'Create an account'}
           </button>
         </p>
+        <p className="switch"><Link className="muted" to="/privacy">Privacy policy</Link></p>
       </section>
     </div>
   );
