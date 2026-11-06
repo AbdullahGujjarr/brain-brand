@@ -12,6 +12,8 @@ const REL_TYPES = [
   ['friend', 'Friend'],
   ['family', 'Family'],
   ['love', 'Love'],
+  ['crush', 'Crush'],
+  ['jealous', 'Jealous'],
   ['rival', 'Rival'],
 ];
 const STATUS = ['active', 'injured', 'captured', 'missing', 'dead'];
@@ -190,39 +192,36 @@ export function CharacterSheet({ storyId, character, characters, onSaved, onClos
   );
 }
 
-export function SceneSheet({ characters, selected, onChange, onClose }) {
-  const [picked, setPicked] = useState(selected);
-  const toggle = (id) => setPicked(picked.includes(id) ? picked.filter((p) => p !== id) : [...picked, id]);
+/** Vertical bar on the side of the story: tap faces to choose who is in the next scene. */
+export function SceneRail({ characters, selected, open, onToggle, onChange }) {
   const living = characters.filter((c) => c.status !== 'dead');
+  const flip = (id) => onChange((now) => (now.includes(id) ? now.filter((p) => p !== id) : [...now, id]));
 
+  if (!open) {
+    return (
+      <button className={`rail-handle${selected.length ? ' on' : ''}`} aria-label="Choose who is in this scene" onClick={onToggle}>
+        <span className="rail-arrow" aria-hidden="true">›</span>
+        <span className="rail-count">{selected.length || 'All'}</span>
+      </button>
+    );
+  }
   return (
-    <Sheet title="Who is in this scene?" onClose={onClose}>
-      <p className="muted sheet-hint">The AI will only use the characters you tick. Leave all unticked to use everyone.</p>
-      <div className="pick-list">
-        {living.map((c) => (
-          <label key={c._id} className="pick">
-            <input type="checkbox" checked={picked.includes(c._id)} onChange={() => toggle(c._id)} />
-            <Avatar character={c} size={28} />
-            <span className="pick-name">
-              {c.name}
-              {c.role && <small>{c.role}</small>}
-            </span>
-          </label>
-        ))}
+    <aside className="scene-rail" aria-label="Who is in this scene">
+      <button className="rail-close" aria-label="Close character bar" onClick={onToggle}>‹</button>
+      <button className={`rail-all${selected.length ? '' : ' on'}`} aria-pressed={!selected.length} onClick={() => onChange([])}>All</button>
+      <div className="rail-list">
+        {living.map((c) => {
+          const on = selected.includes(c._id);
+          return (
+            <button key={c._id} className={`rail-item${on ? ' on' : ''}${selected.length && !on ? ' dim' : ''}`} aria-pressed={on} onClick={() => flip(c._id)}>
+              <Avatar character={c} size={40} />
+              <small>{c.name}</small>
+              {on && <span className="rail-tick" aria-hidden="true">✓</span>}
+            </button>
+          );
+        })}
       </div>
-      <div className="sheet-actions">
-        <button className="btn" onClick={() => setPicked([])} disabled={!picked.length}>Clear</button>
-        <button
-          className="btn primary"
-          onClick={() => {
-            onChange(picked);
-            onClose();
-          }}
-        >
-          {picked.length ? `Use ${picked.length} in scene` : 'Use everyone'}
-        </button>
-      </div>
-    </Sheet>
+    </aside>
   );
 }
 

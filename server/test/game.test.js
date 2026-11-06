@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyGameResult, deriveAlignment, rankCast, resolveCombat, shiftBond, startingStats } from '../src/game.js';
+import { applyGameResult, deriveAlignment, rankCast, resolveCombat, setFeeling, shiftBond, startingStats } from '../src/game.js';
 
 let nextId = 0;
 const person = (name, power, extra = {}) => ({
@@ -151,6 +151,60 @@ test('a fight does not count power twice', () => {
 test('prompt words never become titles', () => {
   assert.equal(startingStats({ title: 'APEX' }).title, '');
   assert.equal(startingStats({ title: 'The Ghost of Ichra' }).title, 'The Ghost of Ichra');
+});
+
+test('a strong protector keeps a loved one alive against weaker attackers', () => {
+  const loved = person('Loved', 30);
+  const guard = person('Guard', 85, { relationships: [{ target: loved._id, type: 'love', score: 80 }] });
+  const attacker = person('Attacker', 50);
+  const effects = resolveCombat({ winners: [attacker], loser: loved, killed: true }, [guard, attacker, loved], 'they fight', 1);
+  assert.equal(loved.status, 'injured');
+  assert.equal(attacker.kills, 0);
+  assert.ok(effects.some((e) => e.kind === 'shield'));
+});
+
+test('the user can still kill a protected character by naming them', () => {
+  const loved = person('Loved', 30);
+  const guard = person('Guard', 85, { relationships: [{ target: loved._id, type: 'love', score: 80 }] });
+  const attacker = person('Attacker', 50);
+  resolveCombat({ winners: [attacker], loser: loved, killed: true }, [guard, attacker, loved], 'Attacker kills Loved', 1);
+  assert.equal(loved.status, 'dead');
+});
+
+test('a much stronger winner hits harder', () => {
+  const big = person('Big', 90);
+  const small = person('Small', 30);
+  resolveCombat({ winners: [big], loser: small, killed: false }, [big, small], 'x', 1);
+  assert.equal(small.power, 7);
+});
+
+test('a one-way feeling stays one-way', () => {
+  const a = person('A', 50);
+  const b = person('B', 50);
+  setFeeling(a, b, 'crush', 'secretly adores', 5);
+  assert.equal(a.relationships[0].type, 'crush');
+  assert.equal(b.relationships.length, 0);
+});
+
+test('love, levels and fear show up in scene results', () => {
+  const a = person('A', 68, { reputation: -55 });
+  const b = person('B', 50);
+  const effects = applyGameResult({
+    characters: [a, b],
+    inScene: () => true,
+    touch: () => {},
+    input: '',
+    chapter: 1,
+    result: {
+      relationshipChanges: [{ from: 'B', to: 'A', type: 'crush', oneWay: true, scoreChange: 10 }],
+      characterChanges: [{ name: 'A', powerChange: 5, reputationChange: -10 }],
+    },
+  });
+  const kinds = effects.map((e) => e.kind);
+  assert.ok(kinds.includes('love'));
+  assert.ok(kinds.includes('level'));
+  assert.ok(kinds.includes('danger'));
+  assert.equal(effects.find((e) => e.kind === 'level').who, 'A');
 });
 
 test('starting stats are kept within limits', () => {

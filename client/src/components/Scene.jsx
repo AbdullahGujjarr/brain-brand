@@ -47,6 +47,18 @@ function Beat({ beat, character, continued, fresh, delay, onOpen, onSave, onDele
   );
   const toggle = () => setOpen(!open);
 
+  if (beat.type === 'crowd') {
+    return (
+      <div className={cls} style={style}>
+        <button className="crowd-line" onClick={toggle} aria-expanded={open}>
+          <span>{beat.speaker}</span>
+          <Rich text={beat.text} />
+        </button>
+        {tools}
+      </div>
+    );
+  }
+
   if (isSpoken(beat)) {
     return (
       <div className={cls} style={style}>
@@ -85,7 +97,7 @@ function Beat({ beat, character, continued, fresh, delay, onOpen, onSave, onDele
 
 const USER_LABEL = { direct: 'You directed', continue: 'You directed', chapter: 'New chapter', ending: 'Your ending' };
 
-const EFFECT_ICONS = { fame: '✦', kill: '💀', combat: '⚔️', power: '▲', loss: '▼', bond: '🤝', secret: '🔓', title: '🏅', rank: '👑', align: '🎭', chapter: '📖' };
+const EFFECT_ICONS = { level: '⬆️', fall: '⬇️', danger: '🔥', respect: '🌟', love: '💘', jealous: '😠', shield: '🛡️', fame: '✦', kill: '💀', combat: '⚔️', power: '▲', loss: '▼', bond: '🤝', secret: '🔓', title: '🏅', rank: '👑', align: '🎭', chapter: '📖' };
 
 function SceneResults({ effects, fresh }) {
   if (!effects?.length) return null;
@@ -143,5 +155,19 @@ export function Scene({ turn, characters, fresh, chapterHeading, readOnly, onOpe
         </div>
       )}
     </article>
+  );
+}
+
+export function ChapterRecap({ recap }) {
+  return (
+    <section className="recap">
+      <span className="recap-label">Chapter {recap.chapter} recap</span>
+      <p>{recap.summary}</p>
+      {recap.moments?.length > 0 && (
+        <ul>
+          {recap.moments.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+    </section>
   );
 }

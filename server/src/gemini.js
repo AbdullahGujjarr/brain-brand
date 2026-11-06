@@ -42,9 +42,10 @@ const newCharacter = {
     voice: str('Their distinct way of speaking, such as "clipped, never finishes a sentence" or "polite, then cruel".'),
     secret: str('Something they hide that can change the story later. Empty if they have none.'),
     concealed: { type: Type.BOOLEAN, description: 'True if they pretend to be weaker than they are.' },
+    gender: { type: Type.STRING, enum: ['male', 'female', 'other'] },
     isUser: { type: Type.BOOLEAN, description: 'True only if this is the user writing as "I" or "me".' },
   },
-  required: ['name', 'role', 'description', 'personality', 'motive'],
+  required: ['name', 'gender', 'role', 'description', 'personality', 'motive'],
 };
 
 const relationship = {
@@ -52,9 +53,10 @@ const relationship = {
   properties: {
     from: str('Character name.'),
     to: str('Character name.'),
-    type: { type: Type.STRING, enum: ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral'] },
+    type: { type: Type.STRING, enum: ['ally', 'enemy', 'family', 'friend', 'love', 'crush', 'jealous', 'rival', 'neutral'] },
     label: str('What "from" is to "to", such as "brother" or "sworn enemy".'),
     reverseLabel: str('What "to" is to "from", such as "sister".'),
+    oneWay: { type: Type.BOOLEAN, description: 'True when only "from" feels this, such as a crush or jealousy.' },
     scoreChange: { type: Type.INTEGER, description: 'How much this scene moved their bond, from -40 to 40.' },
   },
   required: ['from', 'to', 'scoreChange'],
@@ -66,14 +68,15 @@ export const turnSchema = {
     title: str('Short story title of two to five words, with no chapter name. Only needed for the opening scene.'),
     setting: str('World and place in one or two sentences. Only needed for the opening scene.'),
     heading: str('Short scene title of two to five words, in the story language.'),
+    situation: str('Two sentences on the state of play when the scene ends: who is where, who is hurt, who holds what, and what is unresolved.'),
     newCharacters: { type: Type.ARRAY, items: newCharacter },
     beats: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          type: { type: Type.STRING, enum: ['narration', 'dialogue', 'action', 'thought'] },
-          speaker: str('Character name for dialogue, action and thought. Empty for narration.'),
+          type: { type: Type.STRING, enum: ['narration', 'dialogue', 'action', 'thought', 'crowd'] },
+          speaker: str('Character name for dialogue, action and thought. For crowd, a short label such as "A shopkeeper". Empty for narration.'),
           text: str('The prose. For dialogue, only the spoken words, with no quotation marks.'),
         },
         required: ['type', 'speaker', 'text'],
@@ -120,7 +123,16 @@ export const turnSchema = {
       items: { type: Type.STRING },
     },
   },
-  required: ['heading', 'newCharacters', 'beats', 'suggestions'],
+  required: ['heading', 'situation', 'newCharacters', 'beats', 'suggestions'],
+};
+
+export const recapSchema = {
+  type: Type.OBJECT,
+  properties: {
+    summary: str('Three or four sentences on what happened in this chapter.'),
+    moments: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'The three biggest moments, each under ten words.' },
+  },
+  required: ['summary', 'moments'],
 };
 
 function friendlyError(err) {

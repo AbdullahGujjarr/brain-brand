@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { tierOf } from '../game.js';
+import { standing, tierOf } from '../game.js';
+import { portrait } from '../portrait.js';
 
 function badgeFor(character) {
   if (!character) return '';
@@ -20,10 +21,12 @@ export function Avatar({ character, name, size = 36, onClick }) {
     `tier-${tierOf(character).key}`,
     `align-${character?.alignment ?? 'unknown'}`,
     character?.status === 'dead' ? 'dead' : '',
+    character && standing(character) === 'Feared' ? 'feared' : '',
+    character && standing(character) === 'Respected' ? 'respected' : '',
   ].join(' ');
   const face = (
     <span className={classes} style={{ width: size, height: size, background: character?.color ?? '#8a7f70', fontSize: size * 0.38 }}>
-      {initials}
+      {character ? <img src={portrait(character)} alt="" /> : initials}
       {badge && <span className="avatar-badge" style={{ fontSize: Math.max(size * 0.3, 10) }}>{badge}</span>}
     </span>
   );

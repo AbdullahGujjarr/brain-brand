@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const { Schema, model } = mongoose;
 const ObjectId = Schema.Types.ObjectId;
 
-export const REL_TYPES = ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral', 'trusted', 'nemesis'];
+export const REL_TYPES = ['ally', 'enemy', 'family', 'friend', 'love', 'rival', 'neutral', 'trusted', 'nemesis', 'crush', 'jealous'];
 export const CHAR_STATUS = ['active', 'injured', 'captured', 'missing', 'dead'];
 
 const userSchema = new Schema(
@@ -30,6 +30,12 @@ const storySchema = new Schema(
     // strict: only what the user wrote. balanced: small extras. free: AI drives twists.
     freedom: { type: String, enum: ['strict', 'balanced', 'free'], default: 'balanced' },
     length: { type: String, enum: ['short', 'medium', 'long'], default: 'medium' },
+    // How much unnamed bystanders speak up in public scenes.
+    crowd: { type: String, enum: ['off', 'some', 'lively'], default: 'some' },
+    chapterRecaps: {
+      type: [{ chapter: Number, summary: String, moments: [String], _id: false }],
+      default: [],
+    },
     // Long stories: older turns are folded into `memory`, recent turns stay verbatim.
     memory: { type: String, default: '' },
     memoryThrough: { type: Number, default: -1 },
@@ -59,6 +65,7 @@ const characterSchema = new Schema(
     reputation: { type: Number, default: 0 },
     alignment: { type: String, enum: ['hero', 'villain', 'grey', 'unknown'], default: 'unknown' },
     title: { type: String, default: '' },
+    gender: { type: String, enum: ['male', 'female', 'other'], default: 'other' },
     voice: { type: String, default: '' },
     kills: { type: Number, default: 0 },
     villainsSlain: { type: Number, default: 0 },
@@ -94,7 +101,7 @@ characterSchema.set('toJSON', {
 });
 
 const beatSchema = new Schema({
-  type: { type: String, enum: ['narration', 'dialogue', 'action', 'thought'], required: true },
+  type: { type: String, enum: ['narration', 'dialogue', 'action', 'thought', 'crowd'], required: true },
   speaker: { type: String, default: '' },
   character: { type: ObjectId, ref: 'Character', default: null },
   text: { type: String, required: true },
@@ -117,7 +124,9 @@ const turnSchema = new Schema(
     // Characters the user limited this scene to. Empty means everyone.
     sceneCast: { type: [ObjectId], default: [] },
     beats: { type: [beatSchema], default: [] },
-    effects: { type: [{ kind: String, text: String, _id: false }], default: [] },
+    effects: { type: [{ kind: String, text: String, who: String, _id: false }], default: [] },
+    // Where everyone stands at the end of the scene, so the next scene stays consistent.
+    situation: { type: String, default: '' },
     suggestions: { type: [String], default: [] },
     // Undo data, so Retry and Delete put the cast back exactly as it was.
     createdCharacters: { type: [ObjectId], default: [] },

@@ -187,21 +187,77 @@ legend .muted { font-weight: 400; }
 .scene-title::after { content: ''; display: block; width: 32px; height: 2px; margin-top: 7px; background: var(--accent); border-radius: 2px; }
 .scene + .scene { border-top: 1px solid var(--line); }
 .avatar-holder { display: inline-flex; flex: none; border-radius: 50%; }
-.avatar { --ring: transparent; position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 50%; color: #fff; font-weight: 700; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring); }
+.avatar { --ring: var(--line); position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 50%; color: #fff; font-weight: 700; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ring); }
+.avatar img { display: block; width: 100%; height: 100%; border-radius: 50%; }
 .avatar.align-hero { --ring: #d9a520; }
 .avatar.align-villain { --ring: #c0263d; }
 .avatar.align-grey { --ring: #8b8f98; }
-.avatar.tier-hidden { --ring: #6d6a75; outline: 2px dashed #6d6a75; outline-offset: 2px; box-shadow: none; }
-.avatar.tier-elite { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), 0 0 10px 1px color-mix(in srgb, var(--ring) 60%, transparent); }
-.avatar.tier-legend { --ring: #e8b931; animation: legend-glow 2.2s ease-in-out infinite; }
-.avatar.tier-legend.align-villain { --ring: #e63950; }
+.avatar.tier-hidden { box-shadow: none; outline: 2px dashed #6d6a75; outline-offset: 2px; }
+.avatar.tier-hidden img { filter: brightness(0.45) contrast(1.1); }
+.avatar.tier-elite { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ring), 0 0 12px 2px color-mix(in srgb, var(--ring) 55%, transparent); }
+.avatar.respected { --ring: #e8b931; animation: shine 3s ease-in-out infinite; }
+.avatar.feared { --ring: #e63950; animation: ember 1.6s ease-in-out infinite; }
+/* Legends wear a turning ring of light. */
+.avatar.tier-legend { --ring: #e8b931; box-shadow: 0 0 16px 4px color-mix(in srgb, var(--ring) 70%, transparent); animation: legend-glow 2.2s ease-in-out infinite; }
+.avatar.tier-legend.align-villain, .avatar.tier-legend.feared { --ring: #e63950; }
+.avatar.tier-legend::before { content: ''; position: absolute; inset: -5px; z-index: -1; border-radius: 50%; background: conic-gradient(from 0deg, var(--ring), #fff4c9, var(--ring), transparent, var(--ring)); animation: spin 3.5s linear infinite; }
 .avatar.dead { filter: grayscale(1); opacity: 0.65; animation: none; }
+.avatar.dead::before { display: none; }
 .avatar-badge { position: absolute; right: -5px; bottom: -4px; display: inline-flex; align-items: center; justify-content: center; min-width: 1.5em; height: 1.5em; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 50%; line-height: 1; }
-@keyframes legend-glow {
-  0%, 100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), 0 0 8px 2px var(--ring); }
-  50% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), 0 0 22px 8px var(--ring); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes legend-glow { 50% { box-shadow: 0 0 26px 9px color-mix(in srgb, var(--ring) 80%, transparent); } }
+@keyframes ember { 50% { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ring), 0 0 18px 5px var(--ring); } }
+@keyframes shine { 50% { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ring), 0 0 14px 3px var(--ring); } }
+@media (prefers-reduced-motion: reduce) { .avatar, .avatar::before { animation: none !important; } }
+
+.beat.crowd { margin: 8px 0 8px 40px; }
+.crowd-line { display: block; width: 100%; text-align: left; font-size: 0.9rem; font-style: italic; color: var(--muted); overflow-wrap: anywhere; }
+.crowd-line span { display: block; font-size: 0.74rem; font-style: normal; font-weight: 700; }
+
+.moment { position: absolute; top: 18%; left: 50%; z-index: 8; display: grid; justify-items: center; gap: 6px; width: min(300px, calc(100% - 32px)); padding: 22px 18px 18px; overflow: hidden; text-align: center; color: #fff; background: linear-gradient(160deg, #2a2018, #14100b); border: 1px solid var(--tone, #e8b931); border-radius: 20px; box-shadow: 0 16px 50px rgb(0 0 0 / 45%), 0 0 30px color-mix(in srgb, var(--tone, #e8b931) 45%, transparent); transform: translateX(-50%); animation: pop 3.4s ease both; }
+.moment > * { position: relative; }
+.moment .avatar { --ring: var(--tone, #e8b931); }
+.moment strong { font: 600 0.8rem var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--tone, #e8b931); }
+.moment > span:last-child { font: 600 1.08rem/1.3 var(--prose); }
+.moment-rays { position: absolute; inset: -60%; background: conic-gradient(from 0deg, transparent 0 8%, color-mix(in srgb, var(--tone, #e8b931) 22%, transparent) 8% 12%, transparent 12% 25%, color-mix(in srgb, var(--tone, #e8b931) 22%, transparent) 25% 29%, transparent 29% 50%, color-mix(in srgb, var(--tone, #e8b931) 22%, transparent) 50% 54%, transparent 54% 75%, color-mix(in srgb, var(--tone, #e8b931) 22%, transparent) 75% 79%, transparent 79%); animation: spin 9s linear infinite; }
+.moment-danger, .moment-kill, .moment-fall { --tone: #ff4d63; }
+.moment-love { --tone: #ff7eb6; }
+.moment-jealous { --tone: #9fdc4a; }
+.moment-secret { --tone: #b58cff; }
+.moment-shield { --tone: #6cc4ff; }
+@keyframes pop {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.7); }
+  9% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+  14%, 88% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.96); }
 }
-@media (prefers-reduced-motion: reduce) { .avatar.tier-legend { animation: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), 0 0 14px 4px var(--ring); } }
+@media (prefers-reduced-motion: reduce) { .moment, .moment-rays { animation: none; } }
+
+.recap { position: relative; margin: 20px 0 10px; padding: 16px 16px 14px; color: #f5ecdd; background: linear-gradient(160deg, #2a2018, #181209); border-radius: 16px; }
+.recap-label { display: block; margin-bottom: 6px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #e8b931; }
+.recap p { font: 400 1rem/1.6 var(--prose); }
+.recap ul { display: grid; gap: 4px; margin: 10px 0 0; padding-left: 18px; font-size: 0.9rem; color: #d9cbb4; }
+
+.rail-handle { position: absolute; left: 0; top: 34%; z-index: 6; display: grid; justify-items: center; gap: 1px; width: 22px; padding: 9px 0; background: var(--surface); border: 1px solid var(--line); border-left: 0; border-radius: 0 12px 12px 0; box-shadow: 2px 2px 8px rgb(60 40 15 / 12%); }
+.rail-handle.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.rail-arrow { font-size: 1.1rem; line-height: 1; }
+.rail-count { font-size: 0.62rem; font-weight: 700; }
+.scene-rail { position: absolute; left: 0; top: 0; bottom: 118px; z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 66px; padding: 8px 4px; background: var(--surface); border-right: 1px solid var(--line); box-shadow: 3px 0 12px rgb(60 40 15 / 10%); animation: slide-in 0.2s ease both; }
+@keyframes slide-in { from { transform: translateX(-100%); } }
+.rail-close { width: 36px; height: 30px; font-size: 1.3rem; line-height: 1; color: var(--muted); }
+.rail-all { min-height: 30px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700; background: var(--surface-2); border-radius: 999px; }
+.rail-all.on { background: var(--accent); color: var(--accent-ink); }
+.rail-list { flex: 1; display: grid; align-content: start; gap: 10px; width: 100%; padding: 6px 0; overflow-y: auto; scrollbar-width: none; }
+.rail-list::-webkit-scrollbar { display: none; }
+.rail-item { position: relative; display: grid; justify-items: center; gap: 5px; transition: opacity 0.15s, transform 0.15s; }
+.rail-item small { max-width: 60px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-item.dim { opacity: 0.4; }
+.rail-item.on { transform: scale(1.06); }
+.rail-tick { position: absolute; top: -3px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; font-size: 0.68rem; color: var(--accent-ink); background: var(--accent); border-radius: 50%; }
+.feed-inner { padding-left: 28px; }
+.story-main.rail-open .feed-inner { padding-left: 76px; }
+.stat-chip.standing-Feared { background: #2a0d12; color: #ff7a8c; }
+.stat-chip.standing-Respected { background: #fff0c2; color: #6b4e00; }
 .beat-tools { display: flex; gap: 14px; margin-top: 4px; font-size: 0.85rem; }
 .beat-tools button { min-height: 32px; color: var(--accent); font-weight: 600; }
 .scene-tools { display: flex; justify-content: flex-end; gap: 16px; font-size: 0.82rem; color: var(--muted); }
@@ -225,9 +281,6 @@ legend .muted { font-weight: 400; }
 .composer-box textarea:focus { outline: none; }
 .composer-bar { display: flex; align-items: center; gap: 6px; }
 .composer-bar .send { margin-left: auto; }
-.scene-pick { display: inline-flex; align-items: center; gap: 5px; min-width: 0; min-height: 36px; padding: 3px 10px; background: var(--surface-2); border-radius: 999px; font-size: 0.86rem; font-weight: 600; }
-.scene-pick.on { background: var(--accent); color: var(--accent-ink); }
-.scene-pick.on .caret { color: inherit; }
 .scene-cast { margin: -6px 0 12px; font-size: 0.8rem; color: var(--muted); }
 .sheet-hint { margin-bottom: 8px; font-size: 0.92rem; }
 .pick-name { min-width: 0; display: grid; line-height: 1.25; }

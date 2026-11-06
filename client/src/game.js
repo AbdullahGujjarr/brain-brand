@@ -10,6 +10,8 @@ const BONDS = {
   love: 'Love',
   rival: 'Rival',
   neutral: 'Neutral',
+  crush: 'Crush',
+  jealous: 'Jealous',
 };
 export const bondName = (type) => BONDS[type] ?? 'Neutral';
 
@@ -30,3 +32,11 @@ export function rankCast(characters) {
 }
 
 export const rankOf = (characters, character) => rankCast(characters).findIndex((c) => c._id === character._id) + 1;
+
+/** How the world sees someone: fear for the dangerous, respect for the honoured. */
+export function standing(character) {
+  if (character.power === undefined) return '';
+  if (character.power >= 70 && character.reputation < 0) return 'Feared';
+  if (character.reputation >= 60) return 'Respected';
+  return '';
+}

@@ -112,10 +112,11 @@ router.get('/:id', async (req, res) => {
 });
 
 router.patch('/:id', async (req, res) => {
-  const { title, freedom, length } = req.body;
+  const { title, freedom, length, crowd } = req.body;
   if (title !== undefined && text(title, 120)) req.story.title = text(title, 120);
   if (FREEDOM.includes(freedom)) req.story.freedom = freedom;
   if (LENGTHS.includes(length)) req.story.length = length;
+  if (['off', 'some', 'lively'].includes(crowd)) req.story.crowd = crowd;
   await req.story.save();
   res.json({ story: req.story });
 });

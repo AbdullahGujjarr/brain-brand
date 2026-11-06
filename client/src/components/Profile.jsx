@@ -1,4 +1,4 @@
-import { ALIGNMENTS, bondName, rankOf, tierOf } from '../game.js';
+import { ALIGNMENTS, bondName, rankOf, standing, tierOf } from '../game.js';
 import { Avatar, Sheet } from './ui.jsx';
 
 function Meter({ label, value, display, center = false }) {
@@ -45,7 +45,7 @@ export function ProfileSheet({ character, characters, onOpen, onEdit, onClose })
     <Sheet title="Character file" onClose={onClose}>
       <div className="profile">
         <div className="profile-head">
-          <Avatar character={character} size={72} />
+          <Avatar character={character} size={88} />
           <div>
             <h3>{character.name}</h3>
             {character.title && <p className="profile-title">{character.title}</p>}
@@ -53,6 +53,7 @@ export function ProfileSheet({ character, characters, onOpen, onEdit, onClose })
               {rank > 0 && <span className="stat-chip strong">#{rank}</span>}
               <span className={`stat-chip tier-${tier.key}`}>{tier.label}</span>
               <span className={`stat-chip align-${character.alignment}`}>{ALIGNMENTS[character.alignment]}</span>
+              {standing(character) && <span className={`stat-chip standing-${standing(character)}`}>{standing(character)}</span>}
               {character.status !== 'active' && <span className="stat-chip warn">{character.status}</span>}
             </div>
           </div>

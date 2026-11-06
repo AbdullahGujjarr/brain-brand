@@ -8,7 +8,7 @@ export const NEMESIS_SCORE = -70;
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
 const norm = (s) => String(s || '').trim().toLowerCase();
 
-const START_SCORE = { ally: 30, friend: 40, family: 50, love: 60, trusted: 75, enemy: -50, rival: -25, nemesis: -75, neutral: 0 };
+const START_SCORE = { crush: 35, jealous: -20, ally: 30, friend: 40, family: 50, love: 60, trusted: 75, enemy: -50, rival: -25, nemesis: -75, neutral: 0 };
 const START_REPUTATION = { hero: 35, villain: -35, grey: 12, unknown: 0 };
 // Family and love stay what they are, whatever happens to the score.
 const SHIFTING_TYPES = ['neutral', 'ally', 'friend', 'rival', 'enemy', 'trusted', 'nemesis'];
@@ -31,6 +31,18 @@ export function namedIn(input, name) {
   const words = norm(input).split(/[^\p{L}\p{N}]+/u);
   return norm(name).split(/\s+/).some((part) => words.includes(part));
 }
+
+const tierName = (power) => {
+  if (power >= 85) return 'Legend';
+  if (power >= 70) return 'Elite';
+  return power >= 45 ? 'Fighter' : 'Rookie';
+};
+
+const FEELINGS = {
+  love: { kind: 'love', verb: 'fell in love with' },
+  crush: { kind: 'love', verb: 'has feelings for' },
+  jealous: { kind: 'jealous', verb: 'is jealous of' },
+};
 
 export function deriveAlignment(reputation) {
   if (reputation >= 30) return 'hero';
@@ -66,6 +78,7 @@ export function startingStats(data) {
     voice: String(data.voice ?? '').slice(0, 300),
     secret: String(data.secret ?? '').slice(0, 500),
     concealed: Boolean(data.concealed),
+    gender: ['male', 'female'].includes(data.gender) ? data.gender : 'other',
   };
 }
 
@@ -82,6 +95,18 @@ export function setRelationship(a, b, type, label = '', reverseLabel = '') {
   };
   put(a, b, label);
   put(b, a, reverseLabel);
+}
+
+/** A feeling only one person has, such as a secret crush or jealousy. */
+export function setFeeling(from, to, type, label, delta) {
+  const existing = from.relationships.find((r) => String(r.target) === String(to._id));
+  if (existing) {
+    existing.type = type;
+    if (label) existing.label = label;
+    existing.score = clamp((existing.score ?? 0) + delta, -100, 100);
+  } else {
+    from.relationships.push({ target: to._id, type, label: label || '', score: clamp((START_SCORE[type] ?? 0) + delta, -100, 100) });
+  }
 }
 
 /** Moves the bond between two characters and returns a message if it changed level. */
@@ -125,8 +150,18 @@ function remember(c, text, chapter) {
  * Applies one fight. The apex can only fall to two or more fighters, to the
  * character ranked just below them, or because the user said so in their direction.
  */
-export function resolveCombat({ winners, loser, killed }, ranked, input, chapter) {
+export function resolveCombat({ winners, loser, killed: wantedKill }, ranked, input, chapter) {
   const apex = apexOf(ranked);
+  const strongest = Math.max(...winners.map((w) => w.power));
+  // Someone strong who is close to the loser keeps them alive against weaker attackers.
+  const guardian = wantedKill && !namedIn(input, loser.name)
+    ? ranked.find((p) => p !== loser
+      && !winners.includes(p)
+      && p.power >= 70
+      && p.power > strongest
+      && (p.relationships.find((r) => String(r.target) === String(loser._id))?.score ?? 0) >= 50)
+    : null;
+  const killed = wantedKill && !guardian;
   const blocked = loser === apex
     && winners.length < 2
     && !winners.includes(ranked[1])
@@ -136,7 +171,7 @@ export function resolveCombat({ winners, loser, killed }, ranked, input, chapter
     for (const w of winners) adjust(w, { power: 3 });
     adjust(loser, { power: -2 });
     remember(loser, `Withstood an attack from ${winners[0].name}`, chapter);
-    return [{ kind: 'combat', text: `${loser.name} withstood ${winners[0].name}. Only two or more, or the next rank, can bring them down` }];
+    return [{ kind: 'combat', who: loser.name, text: `${loser.name} withstood ${winners[0].name}. Only two or more, or the next rank, can bring them down` }];
   }
 
   const effects = [];
@@ -155,13 +190,15 @@ export function resolveCombat({ winners, loser, killed }, ranked, input, chapter
     if (!w.concealed) effects.push({ kind: 'power', text: `${w.name} power +${gain}` });
   }
   const names = winners.map((w) => w.name).join(' and ');
-  effects.unshift({ kind: killed ? 'kill' : 'combat', text: `${names} ${killed ? 'killed' : 'defeated'} ${loser.name}` });
+  effects.unshift({ kind: killed ? 'kill' : 'combat', who: winners[0].name, text: `${names} ${killed ? 'killed' : 'defeated'} ${loser.name}` });
+  if (guardian) effects.push({ kind: 'shield', who: guardian.name, text: `Fear of ${guardian.name} saved ${loser.name}'s life` });
 
   if (killed) {
     loser.status = 'dead';
   } else {
     loser.status = 'injured';
-    const loss = clamp(8 + (winners.length - 1) * 3, 8, 25);
+    // The bigger the gap in strength, the harder the fall.
+    const loss = clamp(8 + (winners.length - 1) * 3 + Math.max(0, strongest - loser.power) / 4, 8, 30);
     adjust(loser, { power: -loss });
     if (!loser.concealed) effects.push({ kind: 'loss', text: `${loser.name} power -${loss}` });
   }
@@ -174,6 +211,7 @@ export function applyGameResult({ result, characters, inScene, touch, input, cha
   const effects = [];
   const before = rankCast(characters)[0];
   const alignments = new Map(characters.map((c) => [c, c.alignment]));
+  const start = new Map(characters.map((c) => [c, { power: c.power, reputation: c.reputation }]));
   const ready = (name) => {
     const c = findCharacter(characters, name);
     if (!c || !inScene(c.name)) return null;
@@ -185,10 +223,21 @@ export function applyGameResult({ result, characters, inScene, touch, input, cha
     const a = ready(r.from);
     const b = ready(r.to);
     if (!a || !b || a === b) continue;
+    const delta = clamp(r.scoreChange, -40, 40);
+    const feeling = FEELINGS[r.type];
+    const had = a.relationships.find((x) => String(x.target) === String(b._id))?.type;
+    if (feeling && had !== r.type) {
+      effects.push({ kind: feeling.kind, who: a.name, text: `${a.name} ${feeling.verb} ${b.name}` });
+      remember(a, `${feeling.verb[0].toUpperCase()}${feeling.verb.slice(1)} ${b.name}`, chapter);
+    }
+    if (r.oneWay && r.type) {
+      setFeeling(a, b, r.type, r.label, delta);
+      continue;
+    }
     if (r.type) setRelationship(a, b, r.type, r.label || '', r.reverseLabel || '');
-    const message = shiftBond(a, b, clamp(r.scoreChange, -40, 40));
+    const message = shiftBond(a, b, delta);
     if (message) {
-      effects.push({ kind: 'bond', text: message });
+      effects.push({ kind: 'bond', who: a.name, text: message });
       remember(a, message, chapter);
       remember(b, message, chapter);
     }
@@ -212,7 +261,7 @@ export function applyGameResult({ result, characters, inScene, touch, input, cha
     if (ch.role) c.role = String(ch.role).slice(0, 120);
     if (cleanTitle(ch.title) && ch.title !== c.title) {
       c.title = cleanTitle(ch.title);
-      effects.push({ kind: 'title', text: `${c.name} earned the title "${c.title}"` });
+      effects.push({ kind: 'title', who: c.name, text: `${c.name} earned the title "${c.title}"` });
     }
     // A fight already moved this character's power, so it must not count twice.
     const power = fought.has(c) ? 0 : clamp(ch.powerChange, -20, 20);
@@ -228,7 +277,7 @@ export function applyGameResult({ result, characters, inScene, touch, input, cha
     if (ch.secretRevealed && (c.secret || c.concealed) && !c.secretRevealed) {
       c.secretRevealed = true;
       c.concealed = false;
-      effects.push({ kind: 'secret', text: c.secret ? `${c.name}'s secret is out: ${c.secret}` : `${c.name} showed their true power` });
+      effects.push({ kind: 'secret', who: c.name, text: c.secret ? `${c.name}'s secret is out: ${c.secret}` : `${c.name} showed their true power` });
       remember(c, 'Their secret was revealed', chapter);
     }
   }
@@ -238,7 +287,22 @@ export function applyGameResult({ result, characters, inScene, touch, input, cha
       effects.push({ kind: 'align', text: `${c.name} is now seen as a ${c.alignment}` });
     }
   }
+  for (const c of characters) {
+    const was = start.get(c);
+    if (!was || c.status === 'dead' || c.concealed) continue;
+    const tier = tierName(c.power);
+    if (tier !== tierName(was.power)) {
+      const rose = c.power > was.power;
+      effects.push({ kind: rose ? 'level' : 'fall', who: c.name, text: `${c.name} ${rose ? 'rose' : 'fell'} to ${tier}` });
+    }
+    if (was.reputation > -60 && c.reputation <= -60 && c.power >= 55 && c.power >= was.power) {
+      effects.push({ kind: 'danger', who: c.name, text: `Everyone now fears ${c.name}` });
+    }
+    if (was.reputation < 60 && c.reputation >= 60) {
+      effects.push({ kind: 'respect', who: c.name, text: `${c.name} has earned everyone's respect` });
+    }
+  }
   const after = rankCast(characters)[0];
-  if (after && after !== before) effects.push({ kind: 'rank', text: `${after.name} is now the most dominant` });
-  return effects.slice(0, 12);
+  if (after && after !== before) effects.push({ kind: 'rank', who: after.name, text: `${after.name} is now the most dominant` });
+  return effects.slice(0, 14);
 }

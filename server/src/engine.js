@@ -1,7 +1,7 @@
 import { Character, Story, Turn } from './models.js';
-import { AiError, generate, turnSchema } from './gemini.js';
+import { AiError, generate, recapSchema, turnSchema } from './gemini.js';
 import { applyGameResult, findCharacter, namedIn, startingStats } from './game.js';
-import { MEMORY_SYSTEM, SYSTEM_PROMPT, buildMemoryPrompt, buildTurnPrompt, turnToText } from './prompts.js';
+import { MEMORY_SYSTEM, RECAP_SYSTEM, SYSTEM_PROMPT, buildMemoryPrompt, buildRecapPrompt, buildTurnPrompt, turnToText } from './prompts.js';
 
 const COLORS = ['#b4532a', '#2f6f73', '#7a4a9e', '#3f7d3a', '#b0304a', '#2d5fa8', '#a67a12', '#8a5a44', '#c2407e', '#4b6b8a'];
 const RECENT_TURNS = 14; // scenes sent word for word
@@ -94,12 +94,19 @@ async function applyResult({ story, characters, result, base, inScene }) {
   for (const b of result.beats ?? []) {
     let text = String(b.text || '').trim();
     if (!text) continue;
+    if (b.type === 'crowd') {
+      if (story.crowd !== 'off') beats.push({ type: 'crowd', speaker: String(b.speaker || 'A voice').trim().slice(0, 40), text });
+      continue;
+    }
     let speaker = b.speaker?.trim() ?? '';
     // Smaller models sometimes write "Ali: words" instead of filling in the speaker.
     const prefix = !speaker && b.type !== 'narration' && /^([^:\n]{1,40}):\s+(.+)$/s.exec(text);
     if (prefix && findCharacter(characters, prefix[1])) [, speaker, text] = prefix;
     // The user chose who is in this scene, so lines from anyone else are dropped.
     if (b.type !== 'narration' && speaker && !inScene(speaker)) continue;
+    // The dead stay silent unless the user brings them back.
+    const known = speaker && findCharacter(characters, speaker);
+    if (b.type !== 'narration' && known?.status === 'dead' && !namedIn(base.input, known.name)) continue;
 
     let character = null;
     if (b.type !== 'narration' && speaker) {
@@ -126,6 +133,7 @@ async function applyResult({ story, characters, result, base, inScene }) {
     index: story.nextIndex,
     chapter: story.chapter,
     heading: String(result.heading ?? '').trim().slice(0, 80),
+    situation: String(result.situation ?? '').trim().slice(0, 600),
     beats,
     effects,
     suggestions: (result.suggestions ?? []).slice(0, 3),
@@ -142,6 +150,21 @@ async function applyResult({ story, characters, result, base, inScene }) {
 export function sceneFilter(chosen, input) {
   if (!chosen.length) return () => true;
   return (name) => Boolean(findCharacter(chosen, name)) || namedIn(input, name);
+}
+
+/** Adds the summary shown at the end of a chapter. A failure here must not lose the scene. */
+async function writeRecap(story, chapter) {
+  try {
+    const turns = await Turn.find({ story: story._id, chapter }).sort('index').lean();
+    if (!turns.length) return;
+    const recap = await generate({ system: RECAP_SYSTEM, prompt: buildRecapPrompt(turns), schema: recapSchema, temperature: 0.4 });
+    story.chapterRecaps = [
+      ...story.chapterRecaps.filter((r) => r.chapter !== chapter),
+      { chapter, summary: String(recap.summary ?? '').trim(), moments: (recap.moments ?? []).slice(0, 3) },
+    ];
+  } catch (err) {
+    console.error('Chapter recap failed:', err.message);
+  }
 }
 
 /** Writes one scene with the AI and stores it. The caller must already hold the story lock. */
@@ -197,7 +220,10 @@ export async function writeScene({ story, mode, input = '', speaker = null, chap
     setChapterTitle(story, story.chapter, String(result.nextChapterTitle ?? '').trim().slice(0, 120));
     turn.effects.push({ kind: 'chapter', text: `Chapter ${story.chapter - 1} complete. Chapter ${story.chapter} begins next` });
     await turn.save();
+    await writeRecap(story, story.chapter - 1);
   }
+  if (mode === 'chapter') await writeRecap(story, story.chapter - 1);
+  if (mode === 'ending') await writeRecap(story, story.chapter);
   if (mode === 'opening') {
     if (result.title?.trim() && story.title === 'Untitled story') story.title = result.title.trim().slice(0, 120);
     if (result.setting?.trim()) story.setting = result.setting.trim();
@@ -230,6 +256,7 @@ export async function rewind(story, fromIndex) {
   await Turn.deleteMany({ story: story._id, index: { $gte: fromIndex } });
 
   story.chapterTitles = story.chapterTitles.slice(0, story.chapter);
+  story.chapterRecaps = story.chapterRecaps.filter((r) => r.chapter < story.chapter);
   story.nextIndex = fromIndex;
   if (story.memoryThrough >= fromIndex) {
     story.memoryHistory = story.memoryHistory.filter((h) => h.through < fromIndex);

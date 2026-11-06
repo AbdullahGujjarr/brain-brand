@@ -10,6 +10,8 @@ Works on phones, tablets and desktops, and can be installed to a phone's home sc
 - **Start from a few lines.** The AI creates the people you name, and builds the story around what you wrote.
 - **Direct or play.** Direct the scene and let the AI play everyone, or speak as one character. Send an empty box and the AI continues by itself.
 - **Play it like a game.** Characters have power, ranks, reputation, bonds and secrets, and every scene changes them. Legends glow, and only two or more fighters, or the next rank, can bring down the strongest.
+- **Love, jealousy and free will.** AI characters choose their own feelings, and romance sits alongside the fighting.
+- **Living world.** Bystanders react in public scenes, and each chapter ends with a recap.
 - **Tap any character** to open their file: stats, relationships and full record.
 - **Automatic chapters.** Long chapters close at a turning point, and each chapter is its own page.
 - **Choose who is in a scene.** Tick two or three characters and the AI leaves everyone else out, unless you name them in your direction.

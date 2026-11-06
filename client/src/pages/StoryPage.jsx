@@ -2,8 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Composer from '../components/Composer.jsx';
-import { CastList, CharacterSheet, GroupSheet, SceneSheet } from '../components/Cast.jsx';
-import { Scene } from '../components/Scene.jsx';
+import { CastList, CharacterSheet, GroupSheet, SceneRail } from '../components/Cast.jsx';
+import Moment, { pickMoment } from '../components/Moment.jsx';
+import { ChapterRecap, Scene } from '../components/Scene.jsx';
 import { ProfileSheet } from '../components/Profile.jsx';
 import { Confirm, Sheet } from '../components/ui.jsx';
 import { FREEDOM } from './NewStory.jsx';
@@ -26,6 +27,8 @@ export default function StoryPage() {
   const [text, setText] = useState('');
   const [speakerId, setSpeakerId] = useState('');
   const [sceneCast, setSceneCast] = useState([]);
+  const [railOpen, setRailOpen] = useState(false);
+  const [moment, setMoment] = useState(null);
   const [retry, setRetry] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +71,8 @@ export default function StoryPage() {
     scrollTarget.current = null;
   }, [turns, busy, story]);
 
+  const clearMoment = useCallback(() => setMoment(null), []);
+
   const attempt = useCallback(async (work) => {
     setError('');
     try {
@@ -96,6 +101,7 @@ export default function StoryPage() {
       setPage(res.turn.chapter);
       setLastChapter(res.turn.chapter);
       setFreshId(res.turn._id);
+      setMoment(pickMoment(res.turn.effects, res.characters));
       scrollTarget.current = res.turn._id;
     });
     setBusy(false);
@@ -216,6 +222,7 @@ export default function StoryPage() {
   const last = turns.at(-1);
   const ended = story.status === 'ended';
   const readOnly = page < lastChapter;
+  const recap = story.chapterRecaps?.find((r) => r.chapter === page);
   const openProfile = (character) => setPanel({ type: 'profile', id: character._id });
   const profiled = panel?.type === 'profile' && characters.find((c) => c._id === panel.id);
   const castProps = {
@@ -253,7 +260,17 @@ export default function StoryPage() {
       )}
 
       <div className="story-layout">
-        <div className="story-main">
+        <div className={`story-main${railOpen ? ' rail-open' : ''}`}>
+          {!readOnly && !ended && (
+            <SceneRail
+              characters={characters}
+              selected={activeCast}
+              open={railOpen}
+              onToggle={() => setRailOpen(!railOpen)}
+              onChange={setSceneCast}
+            />
+          )}
+          {moment && <Moment moment={moment} onDone={clearMoment} />}
           <main className="feed" ref={feed}>
             <div className="feed-inner">
               {hasMore && <button className="btn small load-more" onClick={loadEarlier}>Load earlier scenes</button>}
@@ -277,6 +294,7 @@ export default function StoryPage() {
                   </div>
                 );
               })}
+              {recap && <ChapterRecap recap={recap} />}
               {!turns.length && <p className="empty-page">This chapter begins with your next move.</p>}
               {!busy && !retry && !ended && !readOnly && last?.suggestions?.length > 0 && (
                 <section className="next-ideas" aria-label="Ideas for what happens next">
@@ -318,8 +336,6 @@ export default function StoryPage() {
               speakerId={speakerId}
               setSpeakerId={setSpeakerId}
               characters={characters}
-              sceneCount={activeCast.length}
-              onPickScene={() => setPanel({ type: 'scene' })}
               busy={busy}
               retry={retry}
               onCancelRetry={() => {
@@ -362,9 +378,6 @@ export default function StoryPage() {
           onClose={() => setPanel(null)}
         />
       )}
-      {panel?.type === 'scene' && (
-        <SceneSheet characters={characters} selected={activeCast} onChange={setSceneCast} onClose={() => setPanel(null)} />
-      )}
       {panel?.type === 'group' && (
         <GroupSheet storyId={id} characters={characters} onSaved={setCharacters} onClose={() => setPanel(null)} />
       )}
@@ -406,6 +419,14 @@ function StorySettings({ story, busy, onSave, onNewChapter, onEnd, onDelete, onC
           <div className="segmented">
             {FREEDOM.map(([value, label]) => (
               <button key={value} className={story.freedom === value ? 'on' : ''} onClick={() => onSave({ freedom: value })}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span>Background people</span>
+          <div className="segmented">
+            {[['off', 'Off'], ['some', 'Some'], ['lively', 'Lively']].map(([value, label]) => (
+              <button key={value} className={(story.crowd ?? 'some') === value ? 'on' : ''} onClick={() => onSave({ crowd: value })}>{label}</button>
             ))}
           </div>
         </div>
